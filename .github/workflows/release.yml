@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS universal (arm64 + x86_64)
+          - os: macos-latest
+            target: universal-apple-darwin
+            label: mac-universal
+            bundles: dmg
+
+          # Windows x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            label: win-x64
+            bundles: nsis
+
+          # Windows arm64
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            label: win-arm64
+            bundles: nsis
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target != 'universal-apple-darwin' && matrix.target || '' }}
+
+      - name: Add Rust targets (macOS universal)
+        if: matrix.target == 'universal-apple-darwin'
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+
+      - name: Install dependencies (Ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'S3V ${{ github.ref_name }}'
+          releaseBody: |
+            See the [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+
+            ### Downloads
+            | Platform | File |
+            |----------|------|
+            | macOS (Universal) | `s3v_*_universal.dmg` |
+            | Windows x64 | `s3v_*_x64-setup.exe` |
+            | Windows ARM64 | `s3v_*_arm64-setup.exe` |
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.target == 'universal-apple-darwin' && '--target universal-apple-darwin' || format('--target {0}', matrix.target) }} --bundles ${{ matrix.bundles }}
