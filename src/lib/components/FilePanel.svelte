@@ -66,6 +66,16 @@
   function activateRight() {
     uiStore.setActivePanel('right');
   }
+
+  function handleMouseNav(e: MouseEvent, storeKey: string) {
+    if (e.button === 3) {
+      e.preventDefault();
+      fileStore.goBack(storeKey);
+    } else if (e.button === 4) {
+      e.preventDefault();
+      fileStore.goForward(storeKey);
+    }
+  }
 </script>
 
 <div class="flex flex-1 min-h-0 flex-col overflow-hidden">
@@ -78,6 +88,7 @@
           ? 'ring-1 ring-primary/40 ring-inset'
           : ''}"
         onmousedown={activateLeft}
+        onmouseup={(e) => handleMouseNav(e, profileId)}
         onfocusin={activateLeft}
       >
         <Breadcrumb
@@ -102,6 +113,7 @@
           ? 'ring-1 ring-primary/40 ring-inset'
           : ''}"
         onmousedown={activateRight}
+        onmouseup={(e) => handleMouseNav(e, rightPanelId)}
         onfocusin={activateRight}
       >
         <Breadcrumb
@@ -129,7 +141,11 @@
       prefix={leftState.prefix}
       onnavigate={navigateLeft}
     />
-    <div class="flex flex-1 flex-col overflow-hidden min-h-0">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="flex flex-1 flex-col overflow-hidden min-h-0"
+      onmouseup={(e) => handleMouseNav(e, profileId)}
+    >
       <FileList
         {profileId}
         onnavigate={navigateLeft}

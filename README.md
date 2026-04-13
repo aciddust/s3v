@@ -4,6 +4,8 @@ S3-compatible storage client built with [Tauri v2](https://tauri.app), [SvelteKi
 
 Supports **AWS S3**, **MinIO**, **Cloudflare R2**, and any S3-compatible provider.
 
+[![Release](https://github.com/aciddust/s3v/actions/workflows/release.yml/badge.svg)](https://github.com/aciddust/s3v/actions/workflows/release.yml)
+
 ## Features
 
 - Multi-profile connection management (tabs)

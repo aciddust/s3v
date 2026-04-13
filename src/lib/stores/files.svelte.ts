@@ -3,6 +3,11 @@ import { listObjects, type S3Object } from '$lib/api/s3';
 export type SortField = 'name' | 'size' | 'lastModified';
 export type SortOrder = 'asc' | 'desc';
 
+interface HistoryEntry {
+  bucket: string;
+  prefix: string;
+}
+
 export interface FileState {
   bucket: string;
   prefix: string;
@@ -15,6 +20,8 @@ export interface FileState {
   loadingMore: boolean;
   continuationToken: string | null;
   hasMore: boolean;
+  historyBack: HistoryEntry[];
+  historyForward: HistoryEntry[];
 }
 
 function makeDefaultFileState(): FileState {
@@ -30,6 +37,8 @@ function makeDefaultFileState(): FileState {
     loadingMore: false,
     continuationToken: null,
     hasMore: false,
+    historyBack: [],
+    historyForward: [],
   };
 }
 
@@ -52,8 +61,18 @@ class FileStore {
     this.stateMap = next;
   }
 
-  async navigate(storeKey: string, bucket: string, prefix: string): Promise<void> {
+  async navigate(storeKey: string, bucket: string, prefix: string, skipHistory = false): Promise<void> {
     const profileId = this.resolveProfileId(storeKey);
+    const current = this.getState(storeKey);
+
+    // Push current location to back history (unless navigating via back/forward, first load, or same location)
+    const historyPatch: Partial<FileState> = {};
+    const sameLocation = current.bucket === bucket && current.prefix === prefix;
+    if (!skipHistory && current.bucket && !sameLocation) {
+      historyPatch.historyBack = [...current.historyBack, { bucket: current.bucket, prefix: current.prefix }];
+      historyPatch.historyForward = [];
+    }
+
     this.updateState(storeKey, {
       bucket,
       prefix,
@@ -63,6 +82,7 @@ class FileStore {
       folders: [],
       continuationToken: null,
       hasMore: false,
+      ...historyPatch,
     });
     try {
       const result = await listObjects(profileId, bucket, prefix);
@@ -123,7 +143,83 @@ class FileStore {
   async refresh(storeKey: string): Promise<void> {
     const state = this.getState(storeKey);
     if (!state.bucket) return;
-    await this.navigate(storeKey, state.bucket, state.prefix);
+    await this.navigate(storeKey, state.bucket, state.prefix, true);
+  }
+
+  canGoBack(storeKey: string): boolean {
+    return this.getState(storeKey).historyBack.length > 0;
+  }
+
+  canGoForward(storeKey: string): boolean {
+    return this.getState(storeKey).historyForward.length > 0;
+  }
+
+  async goBack(storeKey: string): Promise<void> {
+    const state = this.getState(storeKey);
+    if (state.historyBack.length === 0) return;
+    const prev = state.historyBack[state.historyBack.length - 1];
+    const newBack = state.historyBack.slice(0, -1);
+    const newForward = [...state.historyForward, { bucket: state.bucket, prefix: state.prefix }];
+    const profileId = this.resolveProfileId(storeKey);
+    this.updateState(storeKey, {
+      bucket: prev.bucket,
+      prefix: prev.prefix,
+      loading: true,
+      selected: new Set(),
+      objects: [],
+      folders: [],
+      continuationToken: null,
+      hasMore: false,
+      historyBack: newBack,
+      historyForward: newForward,
+    });
+    try {
+      const result = await listObjects(profileId, prev.bucket, prev.prefix);
+      this.updateState(storeKey, {
+        objects: result.objects.filter((o) => !o.is_folder),
+        folders: result.common_prefixes,
+        loading: false,
+        continuationToken: result.next_continuation_token,
+        hasMore: result.is_truncated,
+      });
+    } catch (e) {
+      console.error('[files] goBack failed:', e);
+      this.updateState(storeKey, { loading: false });
+    }
+  }
+
+  async goForward(storeKey: string): Promise<void> {
+    const state = this.getState(storeKey);
+    if (state.historyForward.length === 0) return;
+    const next = state.historyForward[state.historyForward.length - 1];
+    const newForward = state.historyForward.slice(0, -1);
+    const newBack = [...state.historyBack, { bucket: state.bucket, prefix: state.prefix }];
+    const profileId = this.resolveProfileId(storeKey);
+    this.updateState(storeKey, {
+      bucket: next.bucket,
+      prefix: next.prefix,
+      loading: true,
+      selected: new Set(),
+      objects: [],
+      folders: [],
+      continuationToken: null,
+      hasMore: false,
+      historyBack: newBack,
+      historyForward: newForward,
+    });
+    try {
+      const result = await listObjects(profileId, next.bucket, next.prefix);
+      this.updateState(storeKey, {
+        objects: result.objects.filter((o) => !o.is_folder),
+        folders: result.common_prefixes,
+        loading: false,
+        continuationToken: result.next_continuation_token,
+        hasMore: result.is_truncated,
+      });
+    } catch (e) {
+      console.error('[files] goForward failed:', e);
+      this.updateState(storeKey, { loading: false });
+    }
   }
 
   toggleSelect(profileId: string, key: string): void {
