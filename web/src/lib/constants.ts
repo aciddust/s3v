@@ -1,5 +1,5 @@
 export const APP_NAME = 'S3V';
-export const APP_VERSION = '0.4.0';
+export const APP_VERSION = '0.4.5';
 export const APP_DESCRIPTION = 'S3-Compatible Storage Client';
 export const GITHUB_URL = 'https://github.com/aciddust/s3v';
 export const FEEDBACK_API = 'https://web.d3fau1t.net/api/feedback';
