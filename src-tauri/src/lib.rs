@@ -5,6 +5,7 @@ mod profile;
 mod s3;
 mod state;
 mod transfer;
+mod native_drag;
 
 use tauri::Manager;
 
@@ -44,13 +45,21 @@ pub fn run() {
             s3::commands::get_presigned_url,
             s3::commands::list_multipart_uploads,
             s3::commands::abort_multipart_upload,
+            s3::commands::classify_paths,
+            s3::commands::check_conflicts,
+            s3::commands::copy_folder,
+            s3::commands::move_folder,
+            s3::commands::cancel_folder_op,
             transfer::commands::enqueue_upload,
             transfer::commands::enqueue_download,
+            transfer::commands::enqueue_folder_upload,
+            transfer::commands::enqueue_folder_download,
             transfer::commands::pause_transfer,
             transfer::commands::resume_transfer,
             transfer::commands::cancel_transfer,
             transfer::commands::list_transfers,
             feedback::send_feedback,
+            native_drag::start_native_drag,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

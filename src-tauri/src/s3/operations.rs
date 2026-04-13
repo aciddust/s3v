@@ -210,10 +210,14 @@ pub async fn rename_folder(
         copy_object(client, bucket, key, bucket, &new_key).await?;
     }
 
-    // Delete all old objects
-    if !keys.is_empty() {
-        delete_objects(client, bucket, &keys).await?;
-    }
+    // Create new folder marker (handles empty folders)
+    create_folder(client, bucket, new_prefix).await?;
+
+    // Delete all old objects + old folder marker
+    let mut all_old_keys = keys;
+    all_old_keys.push(old_prefix.to_string());
+    delete_objects(client, bucket, &all_old_keys).await?;
+
     Ok(())
 }
 
@@ -318,4 +322,58 @@ pub async fn abort_multipart_upload(
         .await
         .map_err(|e| AppError::S3(format!("Failed to abort multipart upload: {e}")))?;
     Ok(())
+}
+
+/// List all object keys under a prefix recursively (no delimiter).
+/// Handles pagination via continuation tokens.
+pub async fn list_all_objects(
+    client: &S3Client,
+    bucket: &str,
+    prefix: &str,
+) -> Result<Vec<String>, AppError> {
+    let mut keys = Vec::new();
+    let mut continuation_token: Option<String> = None;
+
+    loop {
+        let mut req = client
+            .list_objects_v2()
+            .bucket(bucket)
+            .prefix(prefix);
+
+        if let Some(token) = &continuation_token {
+            req = req.continuation_token(token);
+        }
+
+        let resp = req.send().await.map_err(|e| AppError::S3(e.to_string()))?;
+
+        for obj in resp.contents() {
+            if let Some(key) = obj.key() {
+                if key != prefix {
+                    keys.push(key.to_string());
+                }
+            }
+        }
+
+        match resp.next_continuation_token() {
+            Some(token) => continuation_token = Some(token.to_string()),
+            None => break,
+        }
+    }
+
+    Ok(keys)
+}
+
+/// Given a key that conflicts, generate a renamed version with suffix.
+/// "folder/file.txt" → "folder/file (1).txt"
+/// "folder/" → "folder (1)/"
+pub fn resolve_rename_key(key: &str) -> String {
+    if key.ends_with('/') {
+        let base = key.trim_end_matches('/');
+        format!("{} (1)/", base)
+    } else if let Some(dot_pos) = key.rfind('.') {
+        let (name, ext) = key.split_at(dot_pos);
+        format!("{} (1){}", name, ext)
+    } else {
+        format!("{} (1)", key)
+    }
 }

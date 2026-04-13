@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
+  import { TriangleAlert } from '@lucide/svelte';
+  import * as m from '$lib/paraglide/messages';
 
   export type ConfirmAction = 'delete' | 'move' | 'copy' | 'upload';
 
@@ -14,15 +16,14 @@
 
   let { open = $bindable(), action, files, onconfirm, oncancel }: Props = $props();
 
-  const actionLabels: Record<
-    ConfirmAction,
-    { title: string; confirm: string; variant: 'default' | 'destructive' }
-  > = {
-    delete: { title: 'Delete', confirm: 'Delete', variant: 'destructive' },
-    move: { title: 'Move', confirm: 'Move', variant: 'default' },
-    copy: { title: 'Copy', confirm: 'Copy', variant: 'default' },
-    upload: { title: 'Upload', confirm: 'Upload', variant: 'default' },
-  };
+  const actionLabels = $derived<
+    Record<ConfirmAction, { title: string; confirm: string; variant: 'default' | 'destructive'; warning: string }>
+  >({
+    delete: { title: m.confirm_delete(), confirm: m.confirm_delete(), variant: 'destructive', warning: m.confirm_delete_warning() },
+    move: { title: m.confirm_move(), confirm: m.confirm_move(), variant: 'default', warning: m.confirm_move_warning() },
+    copy: { title: m.confirm_copy(), confirm: m.confirm_copy(), variant: 'default', warning: m.confirm_copy_warning() },
+    upload: { title: m.confirm_upload(), confirm: m.confirm_upload(), variant: 'default', warning: m.confirm_upload_warning() },
+  });
 
   const label = $derived(actionLabels[action]);
   const maxShow = 10;
@@ -47,7 +48,7 @@
 <Dialog bind:open>
   <DialogContent class="max-w-sm">
     <DialogHeader>
-      <DialogTitle>{label.title} — {files.length}건</DialogTitle>
+      <DialogTitle>{label.title} — {m.confirm_count({ count: files.length })}</DialogTitle>
     </DialogHeader>
 
     <ul class="max-h-60 overflow-auto space-y-0.5">
@@ -59,11 +60,16 @@
     </ul>
 
     {#if remainCount > 0}
-      <p class="text-xs text-muted-foreground px-2">외 {remainCount}건</p>
+      <p class="text-xs text-muted-foreground px-2">{m.confirm_remaining({ count: remainCount })}</p>
     {/if}
 
+    <div class="flex items-center gap-1.5 px-2 pt-2 text-xs {action === 'delete' || action === 'move' ? 'text-destructive' : 'text-muted-foreground'}">
+      <TriangleAlert class="h-3.5 w-3.5 shrink-0" />
+      <span>{label.warning}</span>
+    </div>
+
     <div class="flex justify-end gap-2 pt-1">
-      <Button variant="ghost" size="sm" onclick={handleCancel}>Cancel</Button>
+      <Button variant="ghost" size="sm" onclick={handleCancel}>{m.confirm_cancel()}</Button>
       <Button variant={label.variant} size="sm" onclick={handleConfirm}>{label.confirm}</Button>
     </div>
   </DialogContent>

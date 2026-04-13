@@ -3,16 +3,18 @@
   import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import { Folder, FolderOpen, ChevronRight, ChevronDown, CornerDownRight } from '@lucide/svelte';
+  import * as m from '$lib/paraglide/messages';
 
   interface Props {
     open: boolean;
     profileId: string;
     bucket: string;
     title?: string;
+    confirmText?: string;
     onconfirm: (prefix: string) => void;
   }
 
-  let { open = $bindable(), profileId, bucket, title = 'Move to...', onconfirm }: Props = $props();
+  let { open = $bindable(), profileId, bucket, title = 'Move to...', confirmText, onconfirm }: Props = $props();
 
   interface FolderNode {
     prefix: string;
@@ -143,7 +145,7 @@
               class="text-muted-foreground py-0.5"
               style="padding-left: {(depth + 1) * 16 + 4}px;"
             >
-              (empty)
+              {m.folder_picker_empty()}
             </div>
           {/if}
         {/if}
@@ -154,12 +156,12 @@
 
     <div class="flex items-center gap-2 text-xs text-muted-foreground">
       <CornerDownRight class="h-3 w-3" />
-      <span class="font-mono truncate">{bucket}/{selectedPrefix || '(root)'}</span>
+      <span class="font-mono truncate">{bucket}/{selectedPrefix || m.folder_picker_root()}</span>
     </div>
 
     <div class="flex justify-end gap-2">
-      <Button variant="ghost" size="sm" onclick={() => (open = false)}>Cancel</Button>
-      <Button size="sm" onclick={handleConfirm}>Move Here</Button>
+      <Button variant="ghost" size="sm" onclick={() => (open = false)}>{m.folder_picker_cancel()}</Button>
+      <Button size="sm" onclick={handleConfirm}>{confirmText || m.folder_picker_confirm()}</Button>
     </div>
   </DialogContent>
 </Dialog>

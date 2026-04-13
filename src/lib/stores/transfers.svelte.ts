@@ -4,6 +4,7 @@ import {
   onTransferProgress,
   onTransferStatusChanged,
   onTransferCompleted,
+  onTransferAdded,
   type TransferJobSummary,
   type TransferProgressEvent,
   type TransferStatusEvent,
@@ -28,7 +29,7 @@ class TransferStore {
       this.jobs = [];
     }
 
-    const [unProgress, unStatus, unCompleted] = await Promise.all([
+    const [unProgress, unStatus, unCompleted, unAdded] = await Promise.all([
       onTransferProgress((e: TransferProgressEvent) => {
         this.jobs = this.jobs.map((job) =>
           job.id === e.id
@@ -66,9 +67,16 @@ class TransferStore {
           job.id === e.id ? { ...job, status: 'completed' } : job,
         );
       }),
+
+      onTransferAdded((job: TransferJobSummary) => {
+        if (this.dismissed.has(job.id)) return;
+        if (!this.jobs.some((j) => j.id === job.id)) {
+          this.jobs = [...this.jobs, job];
+        }
+      }),
     ]);
 
-    this.unlistenFns = [unProgress, unStatus, unCompleted];
+    this.unlistenFns = [unProgress, unStatus, unCompleted, unAdded];
   }
 
   async reload(): Promise<void> {

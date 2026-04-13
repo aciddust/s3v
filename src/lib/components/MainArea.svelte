@@ -19,6 +19,7 @@
       destPrefix: string,
       keys: string[],
     ) => void;
+    onfileopen?: (bucket: string, key: string) => void;
   }
 
   const {
@@ -31,6 +32,7 @@
     onbgcontextmenu,
     onmovetoprefix,
     oncopytoprefix,
+    onfileopen,
   }: Props = $props();
 
   const sidebarWidth = $derived(uiStore.sidebarWidth);
@@ -46,6 +48,7 @@
     width={sidebarWidth}
     {onnavigate}
     {onmovetoprefix}
+    {onbgcontextmenu}
   />
 
   <!-- Resize handle -->
@@ -78,6 +81,7 @@
       {onbgcontextmenu}
       {onmovetoprefix}
       {oncopytoprefix}
+      {onfileopen}
     />
   </div>
 </div>

@@ -2,6 +2,7 @@
   import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
+  import * as m from '$lib/paraglide/messages';
 
   interface Props {
     open: boolean;
@@ -63,7 +64,7 @@
     <!-- svelte-ignore a11y_autofocus -->
     <Input bind:value {placeholder} autofocus onkeydown={handleKeydown} />
     <div class="flex justify-end gap-2">
-      <Button variant="ghost" size="sm" onclick={handleCancel}>Cancel</Button>
+      <Button variant="ghost" size="sm" onclick={handleCancel}>{m.input_cancel()}</Button>
       <Button size="sm" onclick={handleConfirm} disabled={!value.trim()}>{confirmText}</Button>
     </div>
   </DialogContent>

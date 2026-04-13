@@ -2,9 +2,11 @@
   import type { TransferJobSummary } from '$lib/api/transfers';
   import { pauseTransfer, resumeTransfer, cancelTransfer } from '$lib/api/transfers';
   import { transferStore } from '$lib/stores/transfers.svelte';
+  import { revealItemInDir } from '@tauri-apps/plugin-opener';
   import { Progress } from '$lib/components/ui/progress';
   import { Button } from '$lib/components/ui/button';
-  import { Upload, Download, Pause, Play, X, Check, CircleAlert } from '@lucide/svelte';
+  import { Upload, Download, Pause, Play, X, Check, CircleAlert, FolderOpen } from '@lucide/svelte';
+  import * as m from '$lib/paraglide/messages';
 
   interface Props {
     job: TransferJobSummary;
@@ -39,9 +41,19 @@
   const isDone = $derived(
     job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled',
   );
+
+  function handleDblClick() {
+    if (job.status === 'completed' && job.path.local) {
+      revealItemInDir(job.path.local).catch(() => {});
+    }
+  }
 </script>
 
-<div class="flex items-center gap-2 border-b border-border/50 px-3 py-1.5">
+<div
+  role="listitem"
+  class="flex items-center gap-2 border-b border-border/50 px-3 py-1.5 {job.status === 'completed' && job.path.local ? 'cursor-pointer' : ''}"
+  ondblclick={handleDblClick}
+>
   <!-- Type icon -->
   <div class="shrink-0 {statusColors[job.status] ?? 'text-muted-foreground'}">
     {#if job.transfer_type === 'upload'}
@@ -67,7 +79,12 @@
       {#if job.error}
         <span class="text-destructive truncate max-w-32" title={job.error}>{job.error}</span>
       {:else}
-        <span class={statusColors[job.status]}>{job.status}</span>
+        <span class={statusColors[job.status]}>{job.status === 'queued' ? m.transfer_status_queued() :
+ job.status === 'active' ? m.transfer_status_active() :
+ job.status === 'paused' ? m.transfer_status_paused() :
+ job.status === 'completed' ? m.transfer_status_completed() :
+ job.status === 'failed' ? m.transfer_status_failed() :
+ m.transfer_status_cancelled()}</span>
       {/if}
     </div>
   </div>
@@ -80,7 +97,7 @@
         size="icon"
         class="h-6 w-6"
         onclick={() => pauseTransfer(job.id)}
-        title="Pause"
+        title={m.transfer_pause()}
       >
         <Pause class="h-3 w-3" />
       </Button>
@@ -90,15 +107,26 @@
         size="icon"
         class="h-6 w-6"
         onclick={() => resumeTransfer(job.id)}
-        title="Resume"
+        title={m.transfer_resume()}
       >
         <Play class="h-3 w-3" />
       </Button>
     {:else if isDone}
+      {#if job.status === 'completed' && job.path.local}
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-6 w-6"
+          onclick={() => revealItemInDir(job.path.local).catch(() => {})}
+          title={m.transfer_open_folder()}
+        >
+          <FolderOpen class="h-3 w-3" />
+        </Button>
+      {/if}
       <button
         class="group relative h-6 w-6 flex items-center justify-center rounded-md hover:bg-accent/50"
         onclick={() => transferStore.removeJob(job.id)}
-        title="Dismiss"
+        title={m.transfer_dismiss()}
       >
         {#if job.status === 'completed'}
           <Check class="h-3.5 w-3.5 text-green-500 group-hover:hidden" />
@@ -117,7 +145,7 @@
         size="icon"
         class="h-6 w-6"
         onclick={() => cancelTransfer(job.id)}
-        title="Cancel"
+        title={m.transfer_cancel()}
       >
         <X class="h-3 w-3" />
       </Button>

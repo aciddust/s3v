@@ -2,6 +2,7 @@
   import { profileStore } from '$lib/stores/profiles.svelte';
   import { fileStore } from '$lib/stores/files.svelte';
   import { Circle } from '@lucide/svelte';
+  import * as m from '$lib/paraglide/messages';
 
   const activeTab = $derived(profileStore.activeTab);
   const profileId = $derived(profileStore.activeProfileId);
@@ -32,15 +33,15 @@
 >
   <!-- Object count -->
   {#if fileState}
-    <span>{objectCount} item{objectCount !== 1 ? 's' : ''}</span>
+    <span>{m.status_items({ count: objectCount })}</span>
 
     {#if selectedCount > 0}
       <span class="text-foreground">
-        {selectedCount} selected ({formatBytes(selectedSize())})
+        {m.status_selected({ count: selectedCount, size: formatBytes(selectedSize()) })}
       </span>
     {/if}
   {:else}
-    <span>No profile active</span>
+    <span>{m.status_no_profile()}</span>
   {/if}
 
   <div class="flex-1"></div>
@@ -60,12 +61,12 @@
       <span>
         {activeTab.profile.name}
         ({activeTab.status === 'connected'
-          ? 'connected'
+          ? m.status_connected()
           : activeTab.status === 'connecting'
-            ? 'connecting...'
+            ? m.status_connecting()
             : activeTab.status === 'error'
-              ? 'error'
-              : 'disconnected'})
+              ? m.status_error()
+              : m.status_disconnected()})
       </span>
     </div>
   {/if}

@@ -6,6 +6,7 @@
   import type { S3Object } from '$lib/api/s3';
   import FileRow from './FileRow.svelte';
   import { ChevronUp, ChevronDown, CornerLeftUp } from '@lucide/svelte';
+  import * as m from '$lib/paraglide/messages';
 
   interface Props {
     profileId: string;
@@ -19,6 +20,7 @@
       destPrefix: string,
       keys: string[],
     ) => void;
+    onfileopen?: (bucket: string, key: string) => void;
   }
 
   const {
@@ -28,6 +30,7 @@
     onbgcontextmenu,
     onmovetoprefix,
     oncopytoprefix,
+    onfileopen,
   }: Props = $props();
 
   const fs = $derived(fileStore.getState(profileId));
@@ -71,6 +74,9 @@
     if (isFolder(item)) {
       const prefix = item as string;
       onnavigate(fs.bucket, prefix);
+    } else {
+      const obj = item as S3Object;
+      onfileopen?.(fs.bucket, obj.key);
     }
   }
 
@@ -93,7 +99,7 @@
     fileStore.setSort(profileId, field, order);
   }
 
-  function handleDrop(destPrefix: string) {
+  function handleDrop(destPrefix: string, modifier: 'meta' | 'shift' | null = null) {
     const data = dragStore.consume();
     if (!data || !data.keys.length) return;
 
@@ -103,10 +109,21 @@
 
     if (sameBucket && samePrefix) return;
 
+    // Prevent dropping a folder into itself
+    if (sameBucket && data.keys.some((k) => k === destPrefix)) return;
+
     if (isCross) {
-      oncopytoprefix?.(data.bucket, fs.bucket, destPrefix, data.keys);
+      if (modifier === 'shift') {
+        onmovetoprefix?.(data.bucket, destPrefix, data.keys);
+      } else {
+        oncopytoprefix?.(data.bucket, fs.bucket, destPrefix, data.keys);
+      }
     } else {
-      onmovetoprefix?.(data.bucket, destPrefix, data.keys);
+      if (modifier === 'meta') {
+        oncopytoprefix?.(data.bucket, fs.bucket, destPrefix, data.keys);
+      } else {
+        onmovetoprefix?.(data.bucket, destPrefix, data.keys);
+      }
     }
   }
 
@@ -129,14 +146,16 @@
     function onInternalDrop(e: Event) {
       if (!dragStore.payload) return;
 
+      const modifier = (e as CustomEvent<{ modifier: 'meta' | 'shift' | null }>).detail?.modifier ?? null;
+
       const target = e.target as HTMLElement;
       const dropRow = target.closest('[data-drop-key]') as HTMLElement | null;
       if (dropRow) {
         const dropKey = dropRow.dataset.dropKey!;
         const destPrefix = dropKey === '__..__' ? getParentPrefix(fs.prefix) : dropKey;
-        handleDrop(destPrefix);
+        handleDrop(destPrefix, modifier);
       } else {
-        handleDrop(fs.prefix);
+        handleDrop(fs.prefix, modifier);
       }
     }
 
@@ -245,11 +264,11 @@
   >
     {#if fs.loading}
       <div class="flex items-center justify-center py-8 text-sm text-muted-foreground">
-        Loading...
+        {m.filelist_loading()}
       </div>
     {:else if filteredItems.length === 0}
       <div class="flex items-center justify-center py-8 text-sm text-muted-foreground">
-        {fs.bucket ? 'No items' : 'Select a bucket to browse'}
+        {fs.bucket ? m.filelist_no_items() : m.filelist_select_bucket()}
       </div>
     {:else}
       {#if hasParent}

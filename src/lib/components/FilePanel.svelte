@@ -17,6 +17,7 @@
       destPrefix: string,
       keys: string[],
     ) => void;
+    onfileopen?: (bucket: string, key: string) => void;
   }
 
   const {
@@ -26,6 +27,7 @@
     onbgcontextmenu,
     onmovetoprefix,
     oncopytoprefix,
+    onfileopen,
   }: Props = $props();
 
   const leftState = $derived(fileStore.getState(profileId));
@@ -91,6 +93,7 @@
           {onbgcontextmenu}
           {onmovetoprefix}
           {oncopytoprefix}
+          {onfileopen}
         />
       </div>
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -114,6 +117,7 @@
           {onbgcontextmenu}
           {onmovetoprefix}
           {oncopytoprefix}
+          {onfileopen}
         />
       </div>
     </div>
@@ -133,6 +137,7 @@
         {onbgcontextmenu}
         {onmovetoprefix}
         {oncopytoprefix}
+        {onfileopen}
       />
     </div>
   {/if}

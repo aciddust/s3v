@@ -17,7 +17,8 @@
   import { Input } from '$lib/components/ui/input';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import { Separator } from '$lib/components/ui/separator';
-  import { Plug, Trash2, Plus, Pencil, LoaderCircle, Check, X } from '@lucide/svelte';
+  import { Plug, Trash2, Plus, Pencil, LoaderCircle, Check, X, Info } from '@lucide/svelte';
+  import * as m from '$lib/paraglide/messages';
 
   // State
   let profiles = $state<ProfileSummary[]>([]);
@@ -26,6 +27,7 @@
   let saving = $state(false);
   let showForm = $state(false);
   let editingId = $state<string | null>(null);
+  let pathStyleInfoOpen = $state(false);
 
   // Form fields
   let form = $state<ProfileInput>({
@@ -124,7 +126,7 @@
           success: true,
           message: result.success
             ? result.message
-            : `Saved with default bucket: ${form.default_bucket}`,
+            : m.profile_saved_with_bucket({ bucket: form.default_bucket ?? '' }),
         };
         await profileStore.loadProfiles();
         const all = await listProfiles();
@@ -146,7 +148,7 @@
           success: false,
           message:
             result.message +
-            '\n\nTip: If your token is scoped to a specific bucket, fill in "Default Bucket" below.',
+            '\n\n' + m.profile_tip_bucket(),
         };
       }
     } catch (e: any) {
@@ -184,9 +186,9 @@
 </script>
 
 <Dialog bind:open={uiStore.profileManagerOpen}>
-  <DialogContent class="max-w-lg">
+  <DialogContent class="max-w-lg [&_*]:select-none [&_input]:select-text [&_textarea]:select-text">
     <DialogHeader>
-      <DialogTitle>Profile Manager</DialogTitle>
+      <DialogTitle>{m.profile_title()}</DialogTitle>
     </DialogHeader>
 
     <!-- Profile list -->
@@ -195,11 +197,11 @@
         {#if loading}
           <div class="flex items-center justify-center py-4 text-muted-foreground text-sm">
             <LoaderCircle class="h-4 w-4 animate-spin mr-2" />
-            Loading...
+            {m.profile_loading()}
           </div>
         {:else if profiles.length === 0}
           <div class="py-4 text-center text-sm text-muted-foreground">
-            No profiles yet. Create one below.
+            {m.profile_empty()}
           </div>
         {:else}
           {#each profiles as profile}
@@ -210,27 +212,27 @@
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-7 w-7"
+                class="h-7 w-7 cursor-pointer"
                 onclick={() => handleConnect(profile)}
-                title="Connect"
+                title={m.profile_connect()}
               >
                 <Plug class="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-7 w-7"
+                class="h-7 w-7 cursor-pointer"
                 onclick={() => handleEdit(profile.id)}
-                title="Edit"
+                title={m.profile_edit()}
               >
                 <Pencil class="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-7 w-7 text-destructive hover:text-destructive"
+                class="h-7 w-7 cursor-pointer text-destructive hover:text-destructive"
                 onclick={() => handleDelete(profile.id)}
-                title="Delete"
+                title={m.profile_delete()}
               >
                 <Trash2 class="h-3.5 w-3.5" />
               </Button>
@@ -241,26 +243,26 @@
 
       <Separator />
 
-      <Button variant="outline" class="w-full gap-2" onclick={() => (showForm = true)}>
+      <Button variant="outline" class="w-full gap-2 cursor-pointer" onclick={() => (showForm = true)}>
         <Plus class="h-4 w-4" />
-        New Profile
+        {m.profile_new()}
       </Button>
     {:else}
       <!-- Profile form (create or edit) -->
       <div class="space-y-3">
         <p class="text-sm font-medium">
-          {isEditing ? 'Edit Profile' : 'New Profile'}
+          {isEditing ? m.profile_edit_title() : m.profile_new_title()}
         </p>
 
         <!-- Name -->
         <div class="space-y-1">
-          <label class="text-xs text-muted-foreground" for="profile-name">Name</label>
-          <Input id="profile-name" bind:value={form.name} placeholder="My S3 Profile" />
+          <label class="text-xs text-muted-foreground" for="profile-name">{m.profile_name()}</label>
+          <Input id="profile-name" bind:value={form.name} placeholder={m.profile_placeholder_name()} />
         </div>
 
         <!-- Provider -->
         <div class="space-y-1">
-          <span class="text-xs text-muted-foreground">Provider</span>
+          <span class="text-xs text-muted-foreground">{m.profile_provider()}</span>
           <div class="flex gap-2">
             {#each ['aws', 'minio', 'r2', 'custom'] as provider}
               <button
@@ -280,7 +282,7 @@
         <!-- Endpoint (conditional) -->
         {#if needsEndpoint}
           <div class="space-y-1">
-            <label class="text-xs text-muted-foreground" for="profile-endpoint">Endpoint URL</label>
+            <label class="text-xs text-muted-foreground" for="profile-endpoint">{m.profile_endpoint()}</label>
             <Input
               id="profile-endpoint"
               bind:value={form.endpoint as string}
@@ -291,13 +293,13 @@
 
         <!-- Region -->
         <div class="space-y-1">
-          <label class="text-xs text-muted-foreground" for="profile-region">Region</label>
+          <label class="text-xs text-muted-foreground" for="profile-region">{m.profile_region()}</label>
           <Input id="profile-region" bind:value={form.region} placeholder="us-east-1" />
         </div>
 
         <!-- Access Key -->
         <div class="space-y-1">
-          <label class="text-xs text-muted-foreground" for="profile-access-key">Access Key ID</label
+          <label class="text-xs text-muted-foreground" for="profile-access-key">{m.profile_access_key()}</label
           >
           <Input
             id="profile-access-key"
@@ -308,7 +310,7 @@
 
         <!-- Secret Key -->
         <div class="space-y-1">
-          <label class="text-xs text-muted-foreground" for="profile-secret">Secret Access Key</label
+          <label class="text-xs text-muted-foreground" for="profile-secret">{m.profile_secret_key()}</label
           >
           <Input
             id="profile-secret"
@@ -325,13 +327,21 @@
             checked={form.path_style}
             onCheckedChange={(v) => (form.path_style = !!v)}
           />
-          <label class="text-sm" for="path-style">Force path-style URLs</label>
+          <label class="text-sm" for="path-style">{m.profile_path_style()}</label>
+          <button
+            type="button"
+            class="cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+            onclick={() => (pathStyleInfoOpen = true)}
+            title={m.profile_path_style_info_title()}
+          >
+            <Info class="h-3.5 w-3.5" />
+          </button>
         </div>
 
         <!-- Default Bucket (optional) -->
         <div class="space-y-1">
           <label class="text-xs text-muted-foreground" for="profile-default-bucket">
-            Default Bucket <span class="text-zinc-500">(optional — for bucket-scoped tokens)</span>
+            {m.profile_default_bucket()} <span class="text-zinc-500">({m.profile_default_bucket_hint()})</span>
           </label>
           <Input
             id="profile-default-bucket"
@@ -363,17 +373,26 @@
 
         <!-- Actions -->
         <div class="flex gap-2 justify-end">
-          <Button variant="ghost" onclick={resetForm} disabled={saving}>Cancel</Button>
-          <Button onclick={handleSave} disabled={saving || !form.name}>
+          <Button variant="ghost" class="cursor-pointer" onclick={resetForm} disabled={saving}>{m.profile_cancel()}</Button>
+          <Button class="cursor-pointer" onclick={handleSave} disabled={saving || !form.name}>
             {#if saving}
               <LoaderCircle class="h-4 w-4 animate-spin mr-2" />
-              Testing...
+              {m.profile_testing()}
             {:else}
-              {isEditing ? 'Update & Test' : 'Test & Save'}
+              {isEditing ? m.profile_update_test() : m.profile_test_save()}
             {/if}
           </Button>
         </div>
       </div>
     {/if}
+  </DialogContent>
+</Dialog>
+
+<Dialog bind:open={pathStyleInfoOpen}>
+  <DialogContent class="max-w-sm select-none">
+    <DialogHeader>
+      <DialogTitle>{m.profile_path_style_info_title()}</DialogTitle>
+    </DialogHeader>
+    <p class="text-sm text-muted-foreground whitespace-pre-line">{m.profile_path_style_info_body()}</p>
   </DialogContent>
 </Dialog>

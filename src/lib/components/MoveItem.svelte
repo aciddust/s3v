@@ -2,7 +2,7 @@
   import type { MoveJob } from '$lib/stores/moves.svelte';
   import { moveStore } from '$lib/stores/moves.svelte';
   import { Progress } from '$lib/components/ui/progress';
-  import { FolderInput, Check, CircleAlert, LoaderCircle, X } from '@lucide/svelte';
+  import { FolderInput, FolderOutput, Check, CircleAlert, LoaderCircle, X } from '@lucide/svelte';
 
   interface Props {
     job: MoveJob;
@@ -14,12 +14,17 @@
 
   const fileName = $derived(job.key ? (job.key.split('/').at(-1) ?? job.key) : '');
 
+  const isCopy = $derived(job.op === 'copy');
+
+  const actionLabel = $derived(isCopy ? 'Copying' : 'Moving');
+
   const phaseLabel = $derived.by(() => {
     switch (job.phase) {
       case 'start':
-        return 'Preparing...';
+      case 'started':
+        return `${actionLabel}...`;
       case 'copying':
-        return `Copying ${fileName}`;
+        return fileName ? `${actionLabel} ${fileName}` : `${actionLabel}...`;
       case 'deleting':
         return `Deleting ${fileName}`;
       case 'moved':
@@ -28,6 +33,8 @@
         return 'Completed';
       case 'failed':
         return 'Failed';
+      case 'cancelled':
+        return 'Cancelled';
       default:
         return job.phase;
     }
@@ -55,18 +62,24 @@
 
 <div class="flex items-center gap-2 border-b border-border/50 px-3 py-1.5">
   <div class="shrink-0 {statusColor}">
-    <FolderInput class="h-3.5 w-3.5" />
+    {#if isCopy}
+      <FolderOutput class="h-3.5 w-3.5" />
+    {:else}
+      <FolderInput class="h-3.5 w-3.5" />
+    {/if}
   </div>
 
   <div class="flex min-w-0 flex-1 flex-col gap-0.5">
     <div class="flex items-center justify-between gap-2">
       <span
         class="truncate text-xs font-medium"
-        title="Move {job.total} file(s) → {job.destPrefix || '/'}"
+        title="{isCopy ? 'Copy' : 'Move'} {job.total} file(s) → {job.destPrefix || '/'}"
       >
         {job.total === 1 ? fileName || 'Move' : `${job.total} files`} → {job.destPrefix || '/'}
       </span>
-      <span class="shrink-0 text-xs text-muted-foreground">{percent}%</span>
+      {#if !(isCopy && job.total <= 1 && isActive)}
+        <span class="shrink-0 text-xs text-muted-foreground">{percent}%</span>
+      {/if}
     </div>
     <Progress value={percent} class="h-1" />
     <div class="flex items-center justify-between text-[10px] text-muted-foreground">

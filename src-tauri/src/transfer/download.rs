@@ -166,3 +166,48 @@ async fn download_range_with_retry(
         last_err.unwrap_or_else(|| "Download range failed".into()),
     ))
 }
+
+/// Lightweight download: S3 object → local file path.
+/// Used by native drag promise delegate. No progress/cancel support.
+/// Streams the response body to disk instead of buffering entirely in memory.
+pub async fn download_to_path(
+    client: &S3Client,
+    bucket: &str,
+    key: &str,
+    local_path: &str,
+) -> Result<(), AppError> {
+    let resp = client
+        .get_object()
+        .bucket(bucket)
+        .key(key)
+        .send()
+        .await
+        .map_err(|e| AppError::Transfer(format!("Download failed: {e}")))?;
+
+    if let Some(parent) = std::path::Path::new(local_path).parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| AppError::Transfer(format!("Failed to create directory: {e}")))?;
+    }
+
+    let mut file = tokio::fs::File::create(local_path)
+        .await
+        .map_err(|e| AppError::Transfer(format!("Failed to create file: {e}")))?;
+
+    let mut stream = resp.body;
+    while let Some(chunk) = stream
+        .try_next()
+        .await
+        .map_err(|e| AppError::Transfer(format!("Failed to read stream: {e}")))?
+    {
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| AppError::Transfer(format!("Failed to write chunk: {e}")))?;
+    }
+
+    file.flush()
+        .await
+        .map_err(|e| AppError::Transfer(format!("Failed to flush file: {e}")))?;
+
+    Ok(())
+}

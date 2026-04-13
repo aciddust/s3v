@@ -18,7 +18,8 @@ class UIStore {
   dualPanel = $state<boolean>(false);
   activePanel = $state<PanelSide>('left');
   sidebarWidth = $state<number>(220);
-  transferPanelExpanded = $state<boolean>(false);
+  transferPanelVisible = $state<boolean>(false);
+  transferPanelExpanded = $state<boolean>(true);
   searchQuery = $state<string>('');
   profileManagerOpen = $state<boolean>(false);
 
@@ -41,6 +42,15 @@ class UIStore {
   }
 
   toggleTransferPanel(): void {
+    this.transferPanelVisible = !this.transferPanelVisible;
+  }
+
+  showTransferPanel(): void {
+    this.transferPanelVisible = true;
+    this.transferPanelExpanded = true;
+  }
+
+  toggleTransferPanelContent(): void {
     this.transferPanelExpanded = !this.transferPanelExpanded;
   }
 

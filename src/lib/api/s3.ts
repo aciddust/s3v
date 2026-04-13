@@ -137,3 +137,36 @@ export function abortMultipartUpload(
 ): Promise<void> {
   return invoke('abort_multipart_upload', { profileId, bucket, key, uploadId });
 }
+
+export interface ClassifiedPaths {
+  files: string[];
+  directories: string[];
+}
+
+export function classifyPaths(paths: string[]): Promise<ClassifiedPaths> {
+  return invoke('classify_paths', { paths });
+}
+
+export function checkConflicts(profileId: string, bucket: string, keys: string[]): Promise<string[]> {
+  return invoke('check_conflicts', { profileId, bucket, keys });
+}
+
+export function copyFolder(
+  profileId: string, sourceBucket: string, sourcePrefix: string,
+  destBucket: string, destPrefix: string,
+  skipKeys: string[] = [], renameKeys: string[] = []
+): Promise<string> {
+  return invoke('copy_folder', { profileId, sourceBucket, sourcePrefix, destBucket, destPrefix, skipKeys, renameKeys });
+}
+
+export function moveFolder(
+  profileId: string, sourceBucket: string, sourcePrefix: string,
+  destBucket: string, destPrefix: string,
+  skipKeys: string[] = [], renameKeys: string[] = []
+): Promise<string> {
+  return invoke('move_folder', { profileId, sourceBucket, sourcePrefix, destBucket, destPrefix, skipKeys, renameKeys });
+}
+
+export function cancelFolderOp(opId: string): Promise<void> {
+  return invoke('cancel_folder_op', { opId });
+}

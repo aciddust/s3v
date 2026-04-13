@@ -125,9 +125,9 @@
     })(),
   );
 
-  /** Start drag on mousedown for non-folder rows (with a small threshold to avoid accidental drags). */
+  /** Start drag on mousedown (with a small threshold to avoid accidental drags). */
   function handleMouseDown(e: MouseEvent) {
-    if (isFolder) return;
+    console.log('[FileRow] mousedown', { isFolder, itemKey, button: e.button });
     if (e.button !== 0) return;
     // Don't drag from checkbox area
     if ((e.target as HTMLElement).closest('button')) return;
@@ -142,6 +142,7 @@
         const dy = me.clientY - startY;
         if (Math.abs(dx) + Math.abs(dy) < 6) return; // threshold
         started = true;
+        console.log('[FileRow] drag threshold reached, calling ondragstart', { isFolder, itemKey });
         ondragstart(e);
       }
     }

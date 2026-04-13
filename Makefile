@@ -74,44 +74,66 @@ bump: ## Bump version: make bump patch|minor|major (or make bump v=1.2.3)
 	sed -i '' "s/APP_VERSION = '.*'/APP_VERSION = '$$next'/" src/lib/constants.ts; \
 	echo "→ v$$next"
 
-patch minor major: bump
+patch minor major:
 	@true
 
 release: ## Bump, verify, commit, tag, push: make release patch|minor|major
-	@$(MAKE) bump $(filter patch minor major,$(MAKECMDGOALS)) $(if $(v),v=$(v))
-	@version=$$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*: "//;s/".*//'); \
+	@$(MAKE) --no-print-directory _do_release PART="$(filter patch minor major,$(MAKECMDGOALS))" V="$(v)"
+
+_do_release:
+	@current=$$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*: "//;s/".*//'); \
+	if [ -n "$(V)" ]; then \
+		next="$(V)"; \
+	elif [ -n "$(PART)" ]; then \
+		IFS='.' read -r ma mi pa <<< "$$current"; \
+		case $(PART) in \
+			major) next="$$((ma+1)).0.0" ;; \
+			minor) next="$$ma.$$((mi+1)).0" ;; \
+			patch) next="$$ma.$$mi.$$((pa+1))" ;; \
+		esac; \
+	else \
+		echo "Usage: make release patch|minor|major"; exit 1; \
+	fi; \
+	echo "$$current → $$next"; \
+	sed -i '' "s/\"version\": \".*\"/\"version\": \"$$next\"/" src-tauri/tauri.conf.json; \
+	sed -i '' "s/\"version\": \".*\"/\"version\": \"$$next\"/" package.json; \
+	sed -i '' "s/^version = \".*\"/version = \"$$next\"/" src-tauri/Cargo.toml; \
+	sed -i '' "s/APP_VERSION = '.*'/APP_VERSION = '$$next'/" src/lib/constants.ts; \
+	echo "→ v$$next"; \
 	echo ""; \
-	echo "Verifying v$$version across files..."; \
+	echo "Verifying v$$next across files..."; \
 	ok=true; \
 	for f in src-tauri/tauri.conf.json package.json; do \
-		v=$$(grep '"version"' $$f | head -1 | sed 's/.*: "//;s/".*//'); \
-		if [ "$$v" = "$$version" ]; then \
-			echo "  ✓ $$f → $$v"; \
+		fv=$$(grep '"version"' $$f | head -1 | sed 's/.*: "//;s/".*//'); \
+		if [ "$$fv" = "$$next" ]; then \
+			echo "  ✓ $$f → $$fv"; \
 		else \
-			echo "  ✗ $$f → $$v (expected $$version)"; ok=false; \
+			echo "  ✗ $$f → $$fv (expected $$next)"; ok=false; \
 		fi; \
 	done; \
-	v=$$(grep '^version = ' src-tauri/Cargo.toml | head -1 | sed 's/.*= "//;s/".*//'); \
-	if [ "$$v" = "$$version" ]; then \
-		echo "  ✓ src-tauri/Cargo.toml → $$v"; \
+	fv=$$(grep '^version = ' src-tauri/Cargo.toml | head -1 | sed 's/.*= "//;s/".*//'); \
+	if [ "$$fv" = "$$next" ]; then \
+		echo "  ✓ src-tauri/Cargo.toml → $$fv"; \
 	else \
-		echo "  ✗ src-tauri/Cargo.toml → $$v (expected $$version)"; ok=false; \
+		echo "  ✗ src-tauri/Cargo.toml → $$fv (expected $$next)"; ok=false; \
 	fi; \
-	v=$$(grep "APP_VERSION" src/lib/constants.ts | sed "s/.*= '//;s/'.*//"); \
-	if [ "$$v" = "$$version" ]; then \
-		echo "  ✓ src/lib/constants.ts → $$v"; \
+	fv=$$(grep "APP_VERSION" src/lib/constants.ts | sed "s/.*= '//;s/'.*//"); \
+	if [ "$$fv" = "$$next" ]; then \
+		echo "  ✓ src/lib/constants.ts → $$fv"; \
 	else \
-		echo "  ✗ src/lib/constants.ts → $$v (expected $$version)"; ok=false; \
+		echo "  ✗ src/lib/constants.ts → $$fv (expected $$next)"; ok=false; \
 	fi; \
 	if [ "$$ok" = "false" ]; then echo "\nVersion mismatch. Aborting."; exit 1; fi; \
 	echo ""; \
-	echo "Committing & tagging v$$version..."; \
+	echo "Waiting 30s for file watchers to settle..."; \
+	sleep 30; \
+	echo "Committing & tagging v$$next..."; \
 	git add -A; \
-	git commit -m "chore: bump v$$version"; \
-	git tag -a "v$$version" -m "Release v$$version"; \
-	git push origin main "v$$version"; \
+	git commit -m "chore: bump v$$next"; \
+	git tag -a "v$$next" -m "Release v$$next"; \
+	git push origin main "v$$next"; \
 	echo ""; \
-	echo "✓ Released v$$version — CI build triggered"
+	echo "✓ Released v$$next — CI build triggered"
 
 deploy: ## Tag current version and push to trigger release build (no bump)
 	@version=$$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*: "//;s/".*//' ); \

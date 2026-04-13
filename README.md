@@ -19,6 +19,32 @@ Supports **AWS S3**, **MinIO**, **Cloudflare R2**, and any S3-compatible provide
 - Search / filter files
 - Feedback form (built-in)
 
+## Install
+
+### macOS (Homebrew)
+
+```bash
+brew tap aciddust/tap
+brew install --cask s3v
+```
+
+Update:
+
+```bash
+brew update
+brew upgrade --cask s3v
+```
+
+### Manual Download
+
+Download the latest release from the [Releases](https://github.com/aciddust/s3v/releases) page.
+
+| Platform | File |
+| --- | --- |
+| macOS (Universal) | `s3v_*_universal.dmg` |
+| Windows x64 | `s3v_*_x64-setup.exe` |
+| Windows ARM64 | `s3v_*_arm64-setup.exe` |
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org) >= 18

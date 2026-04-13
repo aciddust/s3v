@@ -3,6 +3,7 @@
   import { fileStore } from '$lib/stores/files.svelte';
   import { ChevronRight, Star } from '@lucide/svelte';
   import { Button } from '$lib/components/ui/button';
+  import * as m from '$lib/paraglide/messages';
 
   interface Props {
     profileId: string;
@@ -83,6 +84,6 @@
       />
     </Button>
   {:else}
-    <span class="text-muted-foreground">Select a bucket</span>
+    <span class="text-muted-foreground">{m.breadcrumb_select_bucket()}</span>
   {/if}
 </div>

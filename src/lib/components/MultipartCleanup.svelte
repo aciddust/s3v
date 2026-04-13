@@ -12,6 +12,7 @@
   import { ScrollArea } from '$lib/components/ui/scroll-area';
   import { LoaderCircle, Trash2, RefreshCw } from '@lucide/svelte';
   import { formatDate } from '$lib/utils/format';
+  import * as m from '$lib/paraglide/messages';
 
   interface Props {
     open: boolean;
@@ -101,18 +102,18 @@
 <Dialog bind:open>
   <DialogContent class="max-w-lg">
     <DialogHeader>
-      <DialogTitle>Incomplete Multipart Uploads</DialogTitle>
+      <DialogTitle>{m.multipart_title()}</DialogTitle>
     </DialogHeader>
 
     <p class="text-xs text-muted-foreground">
-      Incomplete uploads consume storage. Select and abort uploads you no longer need.
+      {m.multipart_description()}
     </p>
 
     <!-- Actions bar -->
     <div class="flex items-center gap-2">
       <Button variant="outline" size="sm" class="gap-1.5" onclick={loadUploads} disabled={loading}>
         <RefreshCw class="h-3.5 w-3.5 {loading ? 'animate-spin' : ''}" />
-        Refresh
+        {m.multipart_refresh()}
       </Button>
       {#if uploads.length > 0}
         <Button
@@ -123,7 +124,7 @@
           disabled={aborting || selected.size === 0}
         >
           <Trash2 class="h-3.5 w-3.5" />
-          Abort Selected ({selected.size})
+          {m.multipart_abort_selected({ count: selected.size })}
         </Button>
         <Button
           variant="outline"
@@ -132,7 +133,7 @@
           onclick={handleAbortAll}
           disabled={aborting}
         >
-          Abort All
+          {m.multipart_abort_all()}
         </Button>
       {/if}
     </div>
@@ -142,11 +143,11 @@
       {#if loading}
         <div class="flex items-center justify-center py-6 text-sm text-muted-foreground">
           <LoaderCircle class="h-4 w-4 animate-spin mr-2" />
-          Loading...
+          {m.multipart_loading()}
         </div>
       {:else if uploads.length === 0}
         <div class="py-6 text-center text-sm text-muted-foreground">
-          No incomplete multipart uploads found.
+          {m.multipart_empty()}
         </div>
       {:else}
         <!-- Header -->
@@ -156,8 +157,8 @@
           <button class="shrink-0" onclick={toggleAll}>
             <Checkbox checked={selected.size === uploads.length && uploads.length > 0} />
           </button>
-          <span class="flex-1">Key</span>
-          <span class="w-36 text-right">Initiated</span>
+          <span class="flex-1">{m.multipart_col_key()}</span>
+          <span class="w-36 text-right">{m.multipart_col_initiated()}</span>
         </div>
 
         {#each uploads as upload}
@@ -178,7 +179,7 @@
         {/each}
 
         <div class="px-2 py-1.5 text-xs text-muted-foreground">
-          {uploads.length} incomplete upload{uploads.length !== 1 ? 's' : ''}
+          {m.multipart_count({ count: uploads.length })}
         </div>
       {/if}
     </ScrollArea>

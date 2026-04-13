@@ -7,7 +7,8 @@
   } from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import FeedbackDialog from './FeedbackDialog.svelte';
-  import { APP_NAME, APP_VERSION, APP_DESCRIPTION, SUPPORT_EMAIL } from '$lib/constants';
+  import { APP_NAME, APP_VERSION, SUPPORT_EMAIL } from '$lib/constants';
+  import * as m from '$lib/paraglide/messages';
 
   interface Props {
     open: boolean;
@@ -28,13 +29,13 @@
 
       <div class="text-center space-y-1">
         <p class="text-sm font-medium text-foreground">v{APP_VERSION}</p>
-        <p class="text-xs text-muted-foreground">{APP_DESCRIPTION}</p>
+        <p class="text-xs text-muted-foreground">{m.app_description()}</p>
       </div>
 
       <div class="w-full border-t border-border"></div>
 
       <div class="text-center space-y-0.5">
-        <p class="text-[10px] uppercase tracking-wider text-muted-foreground">Support</p>
+        <p class="text-[10px] uppercase tracking-wider text-muted-foreground">{m.about_support()}</p>
         <button
           class="text-xs text-primary hover:underline"
           onclick={() => { feedbackOpen = true; }}
@@ -43,7 +44,7 @@
         </button>
       </div>
 
-      <Button variant="ghost" size="sm" onclick={() => (open = false)}>Close</Button>
+      <Button variant="ghost" size="sm" onclick={() => (open = false)}>{m.about_close()}</Button>
     </div>
   </DialogContent>
 </Dialog>

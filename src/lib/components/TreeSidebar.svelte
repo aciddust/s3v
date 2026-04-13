@@ -13,6 +13,7 @@
     width?: number;
     onnavigate: (bucket: string, prefix: string) => void;
     onmovetoprefix?: (bucket: string, destPrefix: string, keys: string[]) => void;
+    onbgcontextmenu?: (e: MouseEvent) => void;
   }
 
   const {
@@ -23,12 +24,15 @@
     width = 220,
     onnavigate,
     onmovetoprefix,
+    onbgcontextmenu,
   }: Props = $props();
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="flex h-full flex-col border-r border-border bg-background"
   style="width: {width}px; min-width: {width}px;"
+  oncontextmenu={(e) => { if (onbgcontextmenu) onbgcontextmenu(e); else e.preventDefault(); }}
 >
   <ScrollArea class="flex-1">
     <BucketTree {profileId} {buckets} {activeBucket} {activePrefix} {onnavigate} {onmovetoprefix} />

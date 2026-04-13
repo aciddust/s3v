@@ -82,12 +82,23 @@ pub async fn delete_objects(
     bucket: String,
     keys: Vec<String>,
 ) -> Result<(), AppError> {
+    let client = get_client(&state, &profile_id).await?;
+
+    // Expand folder keys: collect all children so the entire folder is deleted
+    let mut all_keys = Vec::new();
+    for key in &keys {
+        if key.ends_with('/') {
+            let children = operations::list_all_objects(&client, &bucket, key).await?;
+            all_keys.extend(children);
+        }
+        all_keys.push(key.clone());
+    }
+
     logger::info(
         "s3",
-        format!("Deleting {} object(s) from {bucket}", keys.len()),
+        format!("Deleting {} object(s) from {bucket}", all_keys.len()),
     );
-    let client = get_client(&state, &profile_id).await?;
-    let result = operations::delete_objects(&client, &bucket, &keys).await;
+    let result = operations::delete_objects(&client, &bucket, &all_keys).await;
     if let Err(e) = &result {
         logger::error("s3", format!("delete failed: {e}"));
     }
@@ -285,4 +296,476 @@ pub async fn abort_multipart_upload(
     );
     let client = get_client(&state, &profile_id).await?;
     operations::abort_multipart_upload(&client, &bucket, &key, &upload_id).await
+}
+
+#[derive(serde::Serialize)]
+pub struct ClassifiedPaths {
+    pub files: Vec<String>,
+    pub directories: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn classify_paths(paths: Vec<String>) -> Result<ClassifiedPaths, AppError> {
+    let mut files = Vec::new();
+    let mut directories = Vec::new();
+    for path in paths {
+        let metadata = std::fs::metadata(&path)?;
+        if metadata.is_dir() {
+            directories.push(path);
+        } else {
+            files.push(path);
+        }
+    }
+    Ok(ClassifiedPaths { files, directories })
+}
+
+#[tauri::command]
+pub async fn check_conflicts(
+    state: State<'_, AppState>,
+    profile_id: String,
+    bucket: String,
+    keys: Vec<String>,
+) -> Result<Vec<String>, AppError> {
+    let client = get_client(&state, &profile_id).await?;
+    let mut conflicts = Vec::new();
+    for key in &keys {
+        match operations::head_object(&client, &bucket, key).await {
+            Ok(_) => conflicts.push(key.clone()),
+            Err(_) => {}
+        }
+    }
+    Ok(conflicts)
+}
+
+#[tauri::command]
+pub async fn copy_folder(
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+    profile_id: String,
+    source_bucket: String,
+    source_prefix: String,
+    dest_bucket: String,
+    dest_prefix: String,
+    skip_keys: Vec<String>,
+    rename_keys: Vec<String>,
+) -> Result<String, AppError> {
+    let client = get_client(&state, &profile_id).await?;
+    let op_id = uuid::Uuid::new_v4().to_string();
+
+    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+    {
+        let mut ops = state.folder_ops.lock().await;
+        ops.insert(op_id.clone(), cancel_tx);
+    }
+
+    let folder_ops = state.folder_ops.clone();
+    let op_id_clone = op_id.clone();
+
+    tokio::spawn(async move {
+        let all_keys =
+            match operations::list_all_objects(&client, &source_bucket, &source_prefix).await {
+                Ok(keys) => keys,
+                Err(e) => {
+                    let _ = app_handle.emit(
+                        "folder-op-progress",
+                        serde_json::json!({
+                            "id": op_id_clone,
+                            "op": "copy",
+                            "phase": "failed",
+                            "done": 0,
+                            "total": 0,
+                            "key": "",
+                            "source_prefix": source_prefix,
+                            "dest_prefix": dest_prefix,
+                            "error": e.to_string(),
+                        }),
+                    );
+                    let mut ops = folder_ops.lock().await;
+                    ops.remove(&op_id_clone);
+                    return;
+                }
+            };
+
+        let total = all_keys.len();
+        let _ = app_handle.emit(
+            "folder-op-progress",
+            serde_json::json!({
+                "id": op_id_clone,
+                "op": "copy",
+                "phase": "started",
+                "done": 0,
+                "total": total,
+                "key": "",
+                "source_prefix": source_prefix,
+                "dest_prefix": dest_prefix,
+                "error": null,
+            }),
+        );
+
+        let mut done = 0usize;
+        for key in &all_keys {
+            // Check for cancellation
+            if *cancel_rx.borrow() {
+                let _ = app_handle.emit(
+                    "folder-op-progress",
+                    serde_json::json!({
+                        "id": op_id_clone,
+                        "op": "copy",
+                        "phase": "cancelled",
+                        "done": done,
+                        "total": total,
+                        "key": "",
+                        "source_prefix": source_prefix,
+                        "dest_prefix": dest_prefix,
+                        "error": null,
+                    }),
+                );
+                let mut ops = folder_ops.lock().await;
+                ops.remove(&op_id_clone);
+                return;
+            }
+
+            // Compute destination key: strip source prefix and prepend dest prefix
+            let relative = key
+                .strip_prefix(&source_prefix)
+                .unwrap_or(key);
+            let mut dest_key = format!("{}{}", dest_prefix, relative);
+
+            // Apply skip/rename logic
+            if skip_keys.contains(key) {
+                done += 1;
+                continue;
+            }
+            if rename_keys.contains(key) {
+                let renamed_relative = operations::resolve_rename_key(relative);
+                dest_key = format!("{}{}", dest_prefix, renamed_relative);
+            }
+
+            match operations::copy_object(
+                &client,
+                &source_bucket,
+                key,
+                &dest_bucket,
+                &dest_key,
+            )
+            .await
+            {
+                Ok(()) => {
+                    done += 1;
+                    let _ = app_handle.emit(
+                        "folder-op-progress",
+                        serde_json::json!({
+                            "id": op_id_clone,
+                            "op": "copy",
+                            "phase": "copying",
+                            "done": done,
+                            "total": total,
+                            "key": key,
+                            "source_prefix": source_prefix,
+                            "dest_prefix": dest_prefix,
+                            "error": null,
+                        }),
+                    );
+                }
+                Err(e) => {
+                    done += 1;
+                    let _ = app_handle.emit(
+                        "folder-op-progress",
+                        serde_json::json!({
+                            "id": op_id_clone,
+                            "op": "copy",
+                            "phase": "failed",
+                            "done": done,
+                            "total": total,
+                            "key": key,
+                            "source_prefix": source_prefix,
+                            "dest_prefix": dest_prefix,
+                            "error": e.to_string(),
+                        }),
+                    );
+                    // Continue with next key on individual failure
+                }
+            }
+        }
+
+        // Create destination folder marker
+        let _ = operations::create_folder(&client, &dest_bucket, &dest_prefix).await;
+
+        // Completed
+        let _ = app_handle.emit(
+            "folder-op-progress",
+            serde_json::json!({
+                "id": op_id_clone,
+                "op": "copy",
+                "phase": "completed",
+                "done": done,
+                "total": total,
+                "key": "",
+                "source_prefix": source_prefix,
+                "dest_prefix": dest_prefix,
+                "error": null,
+            }),
+        );
+        let mut ops = folder_ops.lock().await;
+        ops.remove(&op_id_clone);
+    });
+
+    Ok(op_id)
+}
+
+#[tauri::command]
+pub async fn move_folder(
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+    profile_id: String,
+    source_bucket: String,
+    source_prefix: String,
+    dest_bucket: String,
+    dest_prefix: String,
+    skip_keys: Vec<String>,
+    rename_keys: Vec<String>,
+) -> Result<String, AppError> {
+    let client = get_client(&state, &profile_id).await?;
+    let op_id = uuid::Uuid::new_v4().to_string();
+
+    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+    {
+        let mut ops = state.folder_ops.lock().await;
+        ops.insert(op_id.clone(), cancel_tx);
+    }
+
+    let folder_ops = state.folder_ops.clone();
+    let op_id_clone = op_id.clone();
+
+    tokio::spawn(async move {
+        let all_keys =
+            match operations::list_all_objects(&client, &source_bucket, &source_prefix).await {
+                Ok(keys) => keys,
+                Err(e) => {
+                    let _ = app_handle.emit(
+                        "folder-op-progress",
+                        serde_json::json!({
+                            "id": op_id_clone,
+                            "op": "move",
+                            "phase": "failed",
+                            "done": 0,
+                            "total": 0,
+                            "key": "",
+                            "source_prefix": source_prefix,
+                            "dest_prefix": dest_prefix,
+                            "error": e.to_string(),
+                        }),
+                    );
+                    let mut ops = folder_ops.lock().await;
+                    ops.remove(&op_id_clone);
+                    return;
+                }
+            };
+
+        let total = all_keys.len();
+        let _ = app_handle.emit(
+            "folder-op-progress",
+            serde_json::json!({
+                "id": op_id_clone,
+                "op": "move",
+                "phase": "started",
+                "done": 0,
+                "total": total,
+                "key": "",
+                "source_prefix": source_prefix,
+                "dest_prefix": dest_prefix,
+                "error": null,
+            }),
+        );
+
+        let mut done = 0usize;
+        let mut copied_keys: Vec<String> = Vec::new();
+        let mut copy_failed = false;
+
+        // Copy phase
+        for key in &all_keys {
+            // Check for cancellation
+            if *cancel_rx.borrow() {
+                let _ = app_handle.emit(
+                    "folder-op-progress",
+                    serde_json::json!({
+                        "id": op_id_clone,
+                        "op": "move",
+                        "phase": "cancelled",
+                        "done": done,
+                        "total": total,
+                        "key": "",
+                        "source_prefix": source_prefix,
+                        "dest_prefix": dest_prefix,
+                        "error": null,
+                    }),
+                );
+                let mut ops = folder_ops.lock().await;
+                ops.remove(&op_id_clone);
+                return;
+            }
+
+            // Compute destination key: strip source prefix and prepend dest prefix
+            let relative = key
+                .strip_prefix(&source_prefix)
+                .unwrap_or(key);
+            let mut dest_key = format!("{}{}", dest_prefix, relative);
+
+            // Apply skip/rename logic
+            if skip_keys.contains(key) {
+                done += 1;
+                continue;
+            }
+            if rename_keys.contains(key) {
+                let renamed_relative = operations::resolve_rename_key(relative);
+                dest_key = format!("{}{}", dest_prefix, renamed_relative);
+            }
+
+            match operations::copy_object(
+                &client,
+                &source_bucket,
+                key,
+                &dest_bucket,
+                &dest_key,
+            )
+            .await
+            {
+                Ok(()) => {
+                    done += 1;
+                    copied_keys.push(key.clone());
+                    let _ = app_handle.emit(
+                        "folder-op-progress",
+                        serde_json::json!({
+                            "id": op_id_clone,
+                            "op": "move",
+                            "phase": "copying",
+                            "done": done,
+                            "total": total,
+                            "key": key,
+                            "source_prefix": source_prefix,
+                            "dest_prefix": dest_prefix,
+                            "error": null,
+                        }),
+                    );
+                }
+                Err(e) => {
+                    done += 1;
+                    copy_failed = true;
+                    let _ = app_handle.emit(
+                        "folder-op-progress",
+                        serde_json::json!({
+                            "id": op_id_clone,
+                            "op": "move",
+                            "phase": "failed",
+                            "done": done,
+                            "total": total,
+                            "key": key,
+                            "source_prefix": source_prefix,
+                            "dest_prefix": dest_prefix,
+                            "error": e.to_string(),
+                        }),
+                    );
+                    // Continue with next key on individual failure
+                }
+            }
+        }
+
+        // Create destination folder marker
+        let _ = operations::create_folder(&client, &dest_bucket, &dest_prefix).await;
+
+        // Delete phase: only if copy completed without cancellation and without failures
+        if !copy_failed {
+            for key in &copied_keys {
+                // Check for cancellation during delete phase
+                if *cancel_rx.borrow() {
+                    let _ = app_handle.emit(
+                        "folder-op-progress",
+                        serde_json::json!({
+                            "id": op_id_clone,
+                            "op": "move",
+                            "phase": "cancelled",
+                            "done": done,
+                            "total": total,
+                            "key": "",
+                            "source_prefix": source_prefix,
+                            "dest_prefix": dest_prefix,
+                            "error": null,
+                        }),
+                    );
+                    let mut ops = folder_ops.lock().await;
+                    ops.remove(&op_id_clone);
+                    return;
+                }
+
+                let _ = app_handle.emit(
+                    "folder-op-progress",
+                    serde_json::json!({
+                        "id": op_id_clone,
+                        "op": "move",
+                        "phase": "deleting",
+                        "done": done,
+                        "total": total,
+                        "key": key,
+                        "source_prefix": source_prefix,
+                        "dest_prefix": dest_prefix,
+                        "error": null,
+                    }),
+                );
+
+                if let Err(e) = operations::delete_objects(&client, &source_bucket, &[key.clone()]).await {
+                    let _ = app_handle.emit(
+                        "folder-op-progress",
+                        serde_json::json!({
+                            "id": op_id_clone,
+                            "op": "move",
+                            "phase": "failed",
+                            "done": done,
+                            "total": total,
+                            "key": key,
+                            "source_prefix": source_prefix,
+                            "dest_prefix": dest_prefix,
+                            "error": e.to_string(),
+                        }),
+                    );
+                }
+            }
+
+            // Delete folder marker
+            let _ = operations::delete_objects(&client, &source_bucket, &[source_prefix.to_string()]).await;
+        }
+
+        // Completed
+        let _ = app_handle.emit(
+            "folder-op-progress",
+            serde_json::json!({
+                "id": op_id_clone,
+                "op": "move",
+                "phase": "completed",
+                "done": done,
+                "total": total,
+                "key": "",
+                "source_prefix": source_prefix,
+                "dest_prefix": dest_prefix,
+                "error": null,
+            }),
+        );
+        let mut ops = folder_ops.lock().await;
+        ops.remove(&op_id_clone);
+    });
+
+    Ok(op_id)
+}
+
+#[tauri::command]
+pub async fn cancel_folder_op(
+    state: State<'_, AppState>,
+    op_id: String,
+) -> Result<(), AppError> {
+    let ops = state.folder_ops.lock().await;
+    if let Some(cancel_tx) = ops.get(&op_id) {
+        let _ = cancel_tx.send(true);
+        Ok(())
+    } else {
+        Err(AppError::S3(format!("Folder operation '{}' not found", op_id)))
+    }
 }

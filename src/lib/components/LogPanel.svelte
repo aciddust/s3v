@@ -8,6 +8,27 @@
 
   let scrollRef = $state<HTMLDivElement | null>(null);
   let copiedLineId = $state<number | null>(null);
+  let panelHeight = $state(200);
+  let resizing = $state(false);
+
+  function startResize(e: MouseEvent) {
+    e.preventDefault();
+    resizing = true;
+    const startY = e.clientY;
+    const startHeight = panelHeight;
+
+    function onMove(me: MouseEvent) {
+      const delta = startY - me.clientY;
+      panelHeight = Math.max(100, Math.min(600, startHeight + delta));
+    }
+    function onUp() {
+      resizing = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
 
   const activeBucket = $derived(() => {
     const pid = profileStore.activeProfileId;
@@ -52,7 +73,13 @@
 </script>
 
 {#if logStore.open}
-  <div class="flex flex-col border-t border-border bg-[#0a0a12] max-h-[280px] min-h-[140px]">
+  <div class="flex flex-col border-t border-border bg-[#0a0a12]" style="height: {panelHeight}px;">
+    <!-- Resize handle -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="h-2 cursor-row-resize hover:bg-primary/20 transition-colors duration-200 shrink-0 {resizing ? 'bg-primary/30' : ''}"
+      onmousedown={startResize}
+    ></div>
     <!-- Header -->
     <div class="flex items-center justify-between px-3 py-1 border-b border-border/50">
       <span class="text-xs font-medium text-muted-foreground">Log</span>

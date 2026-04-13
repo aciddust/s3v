@@ -13,6 +13,7 @@
     {
       "identifier": "http:default",
       "allow": [{ "url": "https://web.d3fau1t.net/api/**" }]
-    }
+    },
+    "opener:default"
   ]
 }

@@ -8,11 +8,13 @@
     FolderPlus,
     Trash2,
     Move,
+    Copy,
     Link,
     Columns2,
     Search,
     Wrench,
   } from '@lucide/svelte';
+  import * as m from '$lib/paraglide/messages';
 
   interface Props {
     disabled?: boolean;
@@ -21,7 +23,9 @@
     onnewfolder?: () => void;
     ondelete?: () => void;
     onmove?: () => void;
+    oncopy?: () => void;
     onshareurl?: () => void;
+    shareDisabled?: boolean;
     onmultipartcleanup?: () => void;
   }
 
@@ -32,7 +36,9 @@
     onnewfolder,
     ondelete,
     onmove,
+    oncopy,
     onshareurl,
+    shareDisabled = false,
     onmultipartcleanup,
   }: Props = $props();
 </script>
@@ -45,10 +51,10 @@
     class="h-7 gap-1.5 px-2 text-xs"
     {disabled}
     onclick={onupload}
-    title="Upload"
+    title={m.toolbar_upload()}
   >
     <Upload class="h-3.5 w-3.5" />
-    Upload
+    {m.toolbar_upload()}
   </Button>
 
   <!-- Download -->
@@ -58,10 +64,10 @@
     class="h-7 gap-1.5 px-2 text-xs"
     {disabled}
     onclick={ondownload}
-    title="Download"
+    title={m.toolbar_download()}
   >
     <Download class="h-3.5 w-3.5" />
-    Download
+    {m.toolbar_download()}
   </Button>
 
   <!-- New Folder -->
@@ -71,10 +77,10 @@
     class="h-7 gap-1.5 px-2 text-xs"
     {disabled}
     onclick={onnewfolder}
-    title="New Folder"
+    title={m.toolbar_new_folder()}
   >
     <FolderPlus class="h-3.5 w-3.5" />
-    Folder
+    {m.toolbar_folder()}
   </Button>
 
   <!-- Delete -->
@@ -84,10 +90,10 @@
     class="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
     {disabled}
     onclick={ondelete}
-    title="Delete"
+    title={m.toolbar_delete()}
   >
     <Trash2 class="h-3.5 w-3.5" />
-    Delete
+    {m.toolbar_delete()}
   </Button>
 
   <!-- Move -->
@@ -97,10 +103,23 @@
     class="h-7 gap-1.5 px-2 text-xs"
     {disabled}
     onclick={onmove}
-    title="Move"
+    title={m.toolbar_move()}
   >
     <Move class="h-3.5 w-3.5" />
-    Move
+    {m.toolbar_move()}
+  </Button>
+
+  <!-- Copy -->
+  <Button
+    variant="ghost"
+    size="sm"
+    class="h-7 gap-1.5 px-2 text-xs"
+    {disabled}
+    onclick={oncopy}
+    title={m.toolbar_copy()}
+  >
+    <Copy class="h-3.5 w-3.5" />
+    {m.toolbar_copy()}
   </Button>
 
   <!-- Share URL -->
@@ -108,12 +127,12 @@
     variant="ghost"
     size="sm"
     class="h-7 gap-1.5 px-2 text-xs"
-    {disabled}
+    disabled={disabled || shareDisabled}
     onclick={onshareurl}
-    title="Share URL"
+    title={m.toolbar_share_url()}
   >
     <Link class="h-3.5 w-3.5" />
-    Share
+    {m.toolbar_share()}
   </Button>
 
   <div class="flex-1"></div>
@@ -125,7 +144,7 @@
     class="h-7 w-7"
     {disabled}
     onclick={onmultipartcleanup}
-    title="Cleanup incomplete uploads"
+    title={m.toolbar_cleanup_uploads()}
   >
     <Wrench class="h-3.5 w-3.5" />
   </Button>
@@ -136,7 +155,7 @@
     size="icon"
     class="h-7 w-7"
     onclick={() => uiStore.toggleDualPanel()}
-    title="Toggle Dual Panel"
+    title={m.toolbar_toggle_dual()}
   >
     <Columns2 class="h-3.5 w-3.5" />
   </Button>
@@ -144,6 +163,6 @@
   <!-- Search -->
   <div class="relative">
     <Search class="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-    <Input class="h-7 w-48 pl-7 text-xs" placeholder="Search..." bind:value={uiStore.searchQuery} />
+    <Input class="h-7 w-48 pl-7 text-xs" placeholder={m.toolbar_search()} bind:value={uiStore.searchQuery} />
   </div>
 </div>

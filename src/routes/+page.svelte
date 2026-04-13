@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { listen } from '@tauri-apps/api/event';
   import { Toaster, toast } from 'svelte-sonner';
 
   // Components
@@ -18,8 +19,12 @@
   import InputDialog from '$lib/components/InputDialog.svelte';
   import FolderPicker from '$lib/components/FolderPicker.svelte';
   import DragOverlay from '$lib/components/DragOverlay.svelte';
+  import FileDetailDialog from '$lib/components/FileDetailDialog.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import type { ConfirmAction } from '$lib/components/ConfirmDialog.svelte';
+  import UploadTypeDialog from '$lib/components/UploadTypeDialog.svelte';
+  import ConflictDialog from '$lib/components/ConflictDialog.svelte';
+  import type { ConflictResult } from '$lib/components/ConflictDialog.svelte';
   import { Button } from '$lib/components/ui/button';
 
   // Stores
@@ -27,6 +32,7 @@
   import { fileStore } from '$lib/stores/files.svelte';
   import { transferStore } from '$lib/stores/transfers.svelte';
   import { bookmarkStore } from '$lib/stores/bookmarks.svelte';
+  import { settingsStore } from '$lib/stores/settings.svelte';
   import { logStore } from '$lib/stores/logs.svelte';
   import { moveStore } from '$lib/stores/moves.svelte';
   import { uiStore, type ContextMenuItem } from '$lib/stores/ui.svelte';
@@ -40,13 +46,18 @@
     getPresignedUrl,
     moveObjects,
     copyObject,
+    copyFolder,
+    moveFolder,
+    checkConflicts,
+    classifyPaths,
   } from '$lib/api/s3';
-  import { enqueueUpload, enqueueDownload, onTransferCompleted } from '$lib/api/transfers';
+  import { enqueueUpload, enqueueDownload, enqueueFolderUpload, enqueueFolderDownload, onTransferCompleted, onTransferAdded } from '$lib/api/transfers';
   import { listProfiles, type ProfileSummary } from '$lib/api/profiles';
 
   // Utils
   import { matchBinding } from '$lib/utils/keys';
   import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+  import * as m from '$lib/paraglide/messages';
 
   // Derived state
   const activeTab = $derived(profileStore.activeTab);
@@ -79,10 +90,50 @@
     }
   });
 
+  // File detail dialog state
+  let fileDetailOpen = $state(false);
+  let fileDetailBucket = $state('');
+  let fileDetailKey = $state('');
+
+  function handleFileOpen(bucket: string, key: string) {
+    fileDetailBucket = bucket;
+    fileDetailKey = key;
+    fileDetailOpen = true;
+  }
+
+  async function handleFileDetailDownload(key: string) {
+    if (!activeProfileId) return;
+    fileDetailOpen = false;
+    try {
+      const destDir = await open({ multiple: false, directory: true });
+      if (!destDir) return;
+      const dir = Array.isArray(destDir) ? destDir[0] : destDir;
+      const filename = key.split('/').pop() || key;
+      await enqueueDownload(activeProfileId, fileDetailBucket, key, `${dir}/${filename}`);
+      if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
+    } catch (e) {
+      console.error('Download failed:', e);
+    }
+  }
+
+  async function handleFileDetailCopyUrl(key: string) {
+    if (!activeProfileId) return;
+    try {
+      const url = await getPresignedUrl(activeProfileId, fileDetailBucket, key, 3600);
+      await writeText(url);
+      toast.success(m.file_detail_url_copied());
+    } catch (e) {
+      console.error('Copy URL failed:', e);
+      toast.error(m.page_share_failed());
+    }
+  }
+
   // Drag state
   let isDragOver = $state(false);
   let multipartCleanupOpen = $state(false);
   let folderPickerOpen = $state(false);
+  let folderPickerTitle = $state('');
+  let folderPickerConfirmText = $state('');
   let folderPickerCallback = $state<(prefix: string) => void>(() => {});
   let inputDialogOpen = $state(false);
   let inputDialogConfig = $state<{
@@ -102,6 +153,14 @@
     inputDialogOpen = true;
   }
 
+  // --- Upload type dialog state ---
+  let uploadTypeOpen = $state(false);
+
+  // --- Conflict dialog state ---
+  let conflictDialogOpen = $state(false);
+  let conflictKeys = $state<string[]>([]);
+  let conflictCallback = $state<((result: ConflictResult) => void) | null>(null);
+
   // --- Confirm dialog state ---
   let confirmDialogOpen = $state(false);
   let confirmDialogAction = $state<ConfirmAction>('delete');
@@ -117,6 +176,7 @@
 
   onMount(() => {
     bookmarkStore.load();
+    settingsStore.load();
     transferStore.init();
     moveStore.init();
     logStore.init();
@@ -137,6 +197,36 @@
       }
     });
 
+    // Refresh panels when folder copy/move/move-objects completes
+    const unlistenFolderOp = listen<{ phase: string }>('folder-op-progress', (e) => {
+      if (e.payload.phase === 'completed' && activeProfileId) {
+        fileStore.refresh(activeProfileId);
+        if (uiStore.dualPanel) {
+          fileStore.refresh(`${activeProfileId}::right`);
+        }
+      }
+    });
+
+    const unlistenMoveProgress = listen<{ phase: string }>('move-progress', (e) => {
+      if (e.payload.phase === 'completed' && activeProfileId) {
+        fileStore.refresh(activeProfileId);
+        if (uiStore.dualPanel) {
+          fileStore.refresh(`${activeProfileId}::right`);
+        }
+      }
+    });
+
+    // Auto-show transfer panel when any transfer is added (including native drag downloads)
+    const unlistenTransferAdded = onTransferAdded(() => {
+      if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
+    });
+
+    const unlistenFolderOpAdded = listen<{ phase: string }>('folder-op-progress', (e) => {
+      if (e.payload.phase === 'started' && settingsStore.autoShowTransfers) {
+        uiStore.showTransferPanel();
+      }
+    });
+
     const unlistenDrop = getCurrentWindow().onDragDropEvent((event) => {
       if (event.payload.type === 'enter') {
         isDragOver = true;
@@ -144,12 +234,16 @@
         isDragOver = false;
       } else if (event.payload.type === 'drop') {
         isDragOver = false;
-        handleFileDrop(event.payload.paths);
+        handleFileDrop(event.payload.paths, event.payload.position);
       }
     });
 
     return () => {
       unlistenUploadDone.then((fn) => fn());
+      unlistenTransferAdded.then((fn) => fn());
+      unlistenFolderOpAdded.then((fn) => fn());
+      unlistenFolderOp.then((fn) => fn());
+      unlistenMoveProgress.then((fn) => fn());
       unlistenDrop.then((fn) => fn());
       transferStore.destroy();
       moveStore.destroy();
@@ -167,7 +261,7 @@
   function handleDelete() {
     if (!activeProfileId || !activeStoreId || !fileState) return;
     if (fileState.selected.size === 0) {
-      toast.warning('Select files to delete');
+      toast.warning(m.page_select_to_delete());
       return;
     }
     const keys = [...fileState.selected];
@@ -188,9 +282,9 @@
     if (!activeProfileId || !activeStoreId || !fileState || !fileState.bucket) return;
     const storeId = activeStoreId;
     showInputDialog({
-      title: 'New Folder',
-      placeholder: 'folder-name',
-      confirmText: 'Create',
+      title: m.page_new_folder(),
+      placeholder: m.page_folder_placeholder(),
+      confirmText: m.page_create(),
       onconfirm: async (name) => {
         if (!activeProfileId || !fileState) return;
         const folderPrefix = fileState.prefix + name.replace(/\/$/, '') + '/';
@@ -213,9 +307,9 @@
     const parts = oldKey.replace(/\/$/, '').split('/');
     const oldName = parts.at(-1) ?? oldKey;
     showInputDialog({
-      title: isDir ? 'Rename Folder' : 'Rename',
+      title: isDir ? m.page_rename_folder() : m.page_rename(),
       defaultValue: oldName,
-      confirmText: 'Rename',
+      confirmText: m.page_rename(),
       onconfirm: async (newName) => {
         if (!activeProfileId || !fileState || newName === oldName) return;
         try {
@@ -237,11 +331,16 @@
     });
   }
 
-  async function handleUpload() {
+  function handleUpload() {
     if (!activeProfileId || !fileState || !fileState.bucket) {
       console.warn('Upload: no active profile or bucket');
       return;
     }
+    uploadTypeOpen = true;
+  }
+
+  async function handleUploadFiles() {
+    if (!activeProfileId || !fileState || !fileState.bucket) return;
     try {
       const selected = await open({
         multiple: true,
@@ -259,7 +358,7 @@
             const key = prefix + fileNames[i];
             await enqueueUpload(pid, String(paths[i]), bucket, key);
           }
-          uiStore.transferPanelExpanded = true;
+          if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
           await transferStore.reload();
         } catch (e) {
           console.error('Upload failed:', e);
@@ -270,10 +369,53 @@
     }
   }
 
+  async function handleUploadFolder() {
+    if (!activeProfileId || !fileState || !fileState.bucket) return;
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: true,
+      });
+      if (!selected) return;
+      const localDir = Array.isArray(selected) ? selected[0] : selected;
+      const dirName = String(localDir).split(/[\\/]/).at(-1) ?? String(localDir);
+      const pid = activeProfileId;
+      const bucket = fileState.bucket;
+      const remotePrefix = fileState.prefix + dirName + '/';
+
+      // Check for conflicts
+      const conflicts = await checkConflicts(pid, bucket, [remotePrefix]);
+      if (conflicts.length > 0) {
+        conflictKeys = conflicts;
+        conflictCallback = async (result: ConflictResult) => {
+          try {
+            await enqueueFolderUpload(pid, String(localDir), bucket, remotePrefix, result.skip, result.rename);
+            if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
+            await transferStore.reload();
+          } catch (e) {
+            console.error('Folder upload failed:', e);
+          }
+        };
+        conflictDialogOpen = true;
+      } else {
+        try {
+          await enqueueFolderUpload(pid, String(localDir), bucket, remotePrefix);
+          if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
+          await transferStore.reload();
+        } catch (e) {
+          console.error('Folder upload failed:', e);
+        }
+      }
+    } catch (e) {
+      console.error('Folder upload failed:', e);
+    }
+  }
+
   async function handleDownload() {
     if (!activeProfileId || !fileState) return;
-    if (fileState.selected.size === 0) {
-      toast.warning('Select files to download');
+    const selected = Array.from(fileState.selected);
+    if (selected.length === 0) {
+      toast.warning(m.page_select_to_download());
       return;
     }
     try {
@@ -283,11 +425,19 @@
       });
       if (!destDir) return;
       const dir = Array.isArray(destDir) ? destDir[0] : destDir;
-      for (const key of fileState.selected) {
-        const fileName = key.split('/').filter(Boolean).at(-1) ?? key;
-        const localPath = dir + '/' + fileName;
-        await enqueueDownload(activeProfileId, fileState.bucket, key, localPath);
+      for (const key of selected) {
+        if (key.endsWith('/')) {
+          // Include folder name in local path: "photos/" → dir/photos/
+          const folderName = key.slice(0, -1).split('/').pop() || '';
+          const folderDest = `${dir}/${folderName}`;
+          await enqueueFolderDownload(activeProfileId, fileState.bucket, key, folderDest);
+        } else {
+          const filename = key.split('/').pop() || key;
+          await enqueueDownload(activeProfileId, fileState.bucket, key, `${dir}/${filename}`);
+        }
       }
+      if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
+      fileStore.clearSelection(activeStoreId!);
     } catch (e) {
       console.error('Download failed:', e);
     }
@@ -296,36 +446,55 @@
   async function handleShare() {
     if (!activeProfileId || !fileState) return;
     if (fileState.selected.size !== 1) {
-      toast.warning('Select exactly one file to share');
+      toast.warning(m.page_select_one_to_share());
       return;
     }
     const shareKey = [...fileState.selected][0];
+    if (shareKey.endsWith('/')) {
+      toast.warning(m.page_share_folder_not_supported());
+      return;
+    }
     try {
       const url = await getPresignedUrl(activeProfileId, fileState.bucket, shareKey, 3600);
       await writeText(url);
-      toast.success('URL copied to clipboard (1h expiry)');
+      toast.success(m.page_url_copied());
     } catch (e) {
       console.error('Share URL failed:', e);
-      toast.error('Failed to generate share URL');
+      toast.error(m.page_share_failed());
     }
   }
 
   function handleMove() {
     if (!activeProfileId || !activeStoreId || !fileState) return;
     if (fileState.selected.size === 0) {
-      toast.warning('Select files to move');
+      toast.warning(m.page_select_to_move());
       return;
     }
     const keys = [...fileState.selected];
     const pid = activeProfileId;
     const storeId = activeStoreId;
     const bkt = fileState.bucket;
-    folderPickerCallback = (destPrefix: string) => {
-      uiStore.transferPanelExpanded = true;
-      moveObjects(pid, bkt, keys, destPrefix)
-        .then(() => fileStore.refresh(storeId))
-        .catch((e) => console.error('Move failed:', e));
+    folderPickerCallback = async (destPrefix: string) => {
+      if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
+      try {
+        for (const key of keys) {
+          if (key.endsWith('/')) {
+            const folderName = key.slice(0, -1).split('/').pop() || '';
+            await moveFolder(pid, bkt, key, bkt, destPrefix + folderName + '/');
+          } else {
+            await moveObjects(pid, bkt, [key], destPrefix);
+          }
+        }
+        await fileStore.refresh(storeId);
+        if (uiStore.dualPanel) {
+          await fileStore.refresh(`${pid}::right`);
+        }
+      } catch (e) {
+        console.error('Move failed:', e);
+      }
     };
+    folderPickerTitle = m.page_move_to();
+    folderPickerConfirmText = '';
     folderPickerOpen = true;
   }
 
@@ -342,17 +511,19 @@
       }
     }
     const items: ContextMenuItem[] = [
-      { label: 'Download', action: handleDownload, disabled: keys.length === 0, separator: false },
+      { label: m.page_context_download(), action: handleDownload, disabled: keys.length === 0, separator: false },
       {
-        label: 'Copy Key',
+        label: m.page_context_copy_key(),
         action: () => handleCopyKey(keys),
         disabled: keys.length === 0,
         separator: false,
       },
-      { label: 'Share URL', action: handleShare, disabled: keys.length !== 1, separator: false },
+      { label: m.page_context_share_url(), action: handleShare, disabled: keys.length !== 1, separator: false },
       { label: '', action: () => {}, separator: true },
-      { label: 'Rename', action: handleRename, disabled: keys.length !== 1, separator: false },
-      { label: 'Delete', action: handleDelete, disabled: keys.length === 0, separator: false },
+      { label: m.page_context_rename(), action: handleRename, disabled: keys.length !== 1, separator: false },
+      { label: m.page_context_delete(), action: handleDelete, disabled: keys.length === 0, separator: false },
+      { label: '', action: () => {}, separator: true },
+      { label: m.page_context_copy_to(), action: () => handleCopy(), disabled: keys.length === 0, separator: false },
     ];
     uiStore.openContextMenu(e.clientX, e.clientY, items);
   }
@@ -360,11 +531,11 @@
   function handleBgContextMenu(e: MouseEvent) {
     e.preventDefault();
     const items: ContextMenuItem[] = [
-      { label: 'Upload', action: handleUpload, disabled: !isConnected, separator: false },
-      { label: 'New Folder', action: handleNewFolder, disabled: !isConnected, separator: false },
+      { label: m.page_context_upload(), action: handleUpload, disabled: !isConnected, separator: false },
+      { label: m.page_context_new_folder(), action: handleNewFolder, disabled: !isConnected, separator: false },
       { label: '', action: () => {}, separator: true },
       {
-        label: 'Refresh',
+        label: m.page_context_refresh(),
         action: () => {
           if (activeStoreId) fileStore.refresh(activeStoreId);
         },
@@ -379,10 +550,10 @@
     if (keys.length === 0) return;
     try {
       await writeText(keys.join('\n'));
-      toast.success(`Copied ${keys.length} key(s)`);
+      toast.success(m.page_copied_keys({ count: keys.length }));
     } catch (e) {
       console.error('Copy key failed:', e);
-      toast.error('Failed to copy key');
+      toast.error(m.page_copy_key_failed());
     }
   }
 
@@ -415,6 +586,46 @@
     }
   }
 
+  async function handleCopy() {
+    if (!activeProfileId || !activeStoreId || !fileState) return;
+    const selected = Array.from(fileState.selected);
+    if (selected.length === 0) return;
+
+    const pid = activeProfileId;
+    const bkt = fileState.bucket;
+    const storeId = activeStoreId;
+    folderPickerCallback = async (destPrefix: string) => {
+      if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
+      try {
+        for (const key of selected) {
+          if (key.endsWith('/')) {
+            const folderName = key.slice(0, -1).split('/').pop() || '';
+            await copyFolder(pid!, bkt, key, bkt, destPrefix + folderName + '/');
+          } else {
+            const filename = key.split('/').pop() || key;
+            const jobId = moveStore.addJob('copy', key, destPrefix + filename);
+            try {
+              await copyObject(pid!, bkt, key, bkt, destPrefix + filename);
+              moveStore.completeJob(jobId, 'completed');
+            } catch (e) {
+              moveStore.completeJob(jobId, 'failed');
+              throw e;
+            }
+          }
+        }
+        await fileStore.refresh(storeId!);
+        if (uiStore.dualPanel) {
+          await fileStore.refresh(`${pid}::right`);
+        }
+      } catch (e) {
+        console.error('Copy failed:', e);
+      }
+    };
+    folderPickerTitle = m.page_copy_to();
+    folderPickerConfirmText = m.folder_picker_confirm_copy();
+    folderPickerOpen = true;
+  }
+
   function handleCopyToPrefix(
     sourceBucket: string,
     destBucket: string,
@@ -424,11 +635,23 @@
     if (!activeProfileId) return;
     const pid = activeProfileId;
     showConfirm('copy', keys, async () => {
+      if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
       try {
         for (const key of keys) {
-          const fileName = key.replace(/\/$/, '').split('/').at(-1) ?? key;
-          const destKey = destPrefix + fileName;
-          await copyObject(pid, sourceBucket, key, destBucket, destKey);
+          if (key.endsWith('/')) {
+            const folderName = key.slice(0, -1).split('/').pop() || '';
+            await copyFolder(pid, sourceBucket, key, destBucket, destPrefix + folderName + '/');
+          } else {
+            const filename = key.split('/').pop() || key;
+            const jobId = moveStore.addJob('copy', key, destPrefix + filename);
+            try {
+              await copyObject(pid, sourceBucket, key, destBucket, destPrefix + filename);
+              moveStore.completeJob(jobId, 'completed');
+            } catch (e) {
+              moveStore.completeJob(jobId, 'failed');
+              throw e;
+            }
+          }
         }
         await fileStore.refresh(pid);
         if (uiStore.dualPanel) {
@@ -444,8 +667,16 @@
     if (!activeProfileId) return;
     const pid = activeProfileId;
     showConfirm('move', keys, async () => {
+      if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
       try {
-        await moveObjects(pid, bucket, keys, destPrefix);
+        for (const key of keys) {
+          if (key.endsWith('/')) {
+            const folderName = key.slice(0, -1).split('/').pop() || '';
+            await moveFolder(pid, bucket, key, bucket, destPrefix + folderName + '/');
+          } else {
+            await moveObjects(pid, bucket, [key], destPrefix);
+          }
+        }
         await fileStore.refresh(pid);
         if (uiStore.dualPanel) {
           await fileStore.refresh(`${pid}::right`);
@@ -456,26 +687,59 @@
     });
   }
 
-  function handleFileDrop(paths: string[]) {
-    if (!paths.length || !activeProfileId || !fileState || !fileState.bucket) return;
+  async function handleFileDrop(paths: string[], position?: { x: number; y: number }) {
+    if (!paths.length || !activeProfileId) return;
+
+    // Determine target panel based on drop position
+    let targetState = fileState;
+    if (uiStore.dualPanel && position && activeProfileId) {
+      const sidebarAndHandle = uiStore.sidebarWidth + 4; // sidebar + resize handle
+      const panelAreaX = position.x - sidebarAndHandle;
+      const panelAreaWidth = window.innerWidth - sidebarAndHandle;
+      const droppedOnRight = panelAreaX > panelAreaWidth / 2;
+      targetState = droppedOnRight
+        ? fileStore.getState(`${activeProfileId}::right`)
+        : fileStore.getState(activeProfileId);
+    }
+
+    if (!targetState || !targetState.bucket) return;
 
     const pid = activeProfileId;
-    const bucket = fileState.bucket;
-    const prefix = fileState.prefix;
-    const fileNames = paths.map((p) => p.split(/[\\/]/).at(-1) ?? p);
+    const bucket = targetState.bucket;
+    const prefix = targetState.prefix;
 
-    showConfirm('upload', fileNames, async () => {
-      uiStore.transferPanelExpanded = true;
-      for (let i = 0; i < paths.length; i++) {
-        const key = prefix + fileNames[i];
-        try {
-          await enqueueUpload(pid, paths[i], bucket, key);
-        } catch (err) {
-          console.error('Drop upload failed:', err);
+    // Classify dropped paths into files and directories
+    const classified = await classifyPaths(paths);
+
+    // Handle files with existing confirm flow
+    if (classified.files.length > 0) {
+      const fileNames = classified.files.map((p) => p.split(/[\\/]/).at(-1) ?? p);
+      showConfirm('upload', fileNames, async () => {
+        if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
+        for (let i = 0; i < classified.files.length; i++) {
+          const key = prefix + fileNames[i];
+          try {
+            await enqueueUpload(pid, classified.files[i], bucket, key);
+          } catch (err) {
+            console.error('Drop upload failed:', err);
+          }
         }
+        await transferStore.reload();
+      });
+    }
+
+    // Handle directories with folder upload
+    for (const dir of classified.directories) {
+      const dirName = dir.split(/[\\/]/).at(-1) ?? dir;
+      const remotePrefix = prefix + dirName + '/';
+      try {
+        await enqueueFolderUpload(pid, dir, bucket, remotePrefix);
+        if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
+        await transferStore.reload();
+      } catch (err) {
+        console.error('Drop folder upload failed:', err);
       }
-      await transferStore.reload();
-    });
+    }
   }
 </script>
 
@@ -501,7 +765,9 @@
     onnewfolder={handleNewFolder}
     ondelete={handleDelete}
     onmove={handleMove}
+    oncopy={handleCopy}
     onshareurl={handleShare}
+    shareDisabled={fileState ? [...fileState.selected].some((k) => k.endsWith('/')) : false}
     onmultipartcleanup={() => (multipartCleanupOpen = true)}
   />
   <TabBar />
@@ -518,6 +784,7 @@
         onbgcontextmenu={handleBgContextMenu}
         onmovetoprefix={handleMoveToPrefix}
         oncopytoprefix={handleCopyToPrefix}
+        onfileopen={handleFileOpen}
       />
     </div>
   {:else}
@@ -529,7 +796,7 @@
           >
             <span class="text-red-500 text-lg">!</span>
           </div>
-          <h2 class="text-lg font-semibold text-foreground">Connection Failed</h2>
+          <h2 class="text-lg font-semibold text-foreground">{m.page_connection_failed()}</h2>
           <p class="text-sm text-red-400 bg-red-500/5 rounded-md px-3 py-2 font-mono break-all">
             {activeTab.error}
           </p>
@@ -538,14 +805,14 @@
               class="text-xs text-primary hover:underline"
               onclick={() => activeProfileId && profileStore.refreshBuckets(activeProfileId)}
             >
-              Retry
+              {m.page_retry()}
             </button>
             <span class="text-zinc-600">·</span>
             <button
               class="text-xs text-muted-foreground hover:underline"
               onclick={() => (uiStore.profileManagerOpen = true)}
             >
-              Edit Profile
+              {m.page_edit_profile()}
             </button>
           </div>
         {:else if activeTab?.status === 'connecting'}
@@ -554,23 +821,23 @@
           >
             <span class="text-yellow-400 text-lg animate-pulse">⟳</span>
           </div>
-          <h2 class="text-lg font-semibold text-foreground">Connecting...</h2>
+          <h2 class="text-lg font-semibold text-foreground">{m.page_connecting()}</h2>
           <p class="text-sm text-muted-foreground">{activeTab.profile.name}</p>
         {:else}
           <h2 class="text-2xl font-bold text-foreground">S3V</h2>
           <p class="text-sm text-muted-foreground mb-4">
             {profileStore.tabs.length === 0
-              ? 'Connect to an S3-compatible storage provider.'
-              : 'Select a tab to browse.'}
+              ? m.page_connect_prompt()
+              : m.page_select_tab()}
           </p>
 
           {#if lastProfile}
             <div
-              class="w-full max-w-xs mx-auto rounded-lg border border-border bg-muted/20 overflow-hidden"
+              class="w-full min-w-[20rem] max-w-[30rem] mx-auto rounded-lg border border-border bg-muted/20 overflow-hidden"
             >
               <div class="px-3 py-1.5 border-b border-border/50">
                 <span class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
-                  >Recent connected</span
+                  >{m.page_recent()}</span
                 >
               </div>
               <button
@@ -586,13 +853,13 @@
                   <div class="text-xs font-medium text-foreground truncate">{lastProfile.name}</div>
                   <div class="text-[10px] text-muted-foreground">{lastProfile.provider}</div>
                 </div>
-                <span class="text-[10px] text-muted-foreground shrink-0">Connect</span>
+                <span class="text-[10px] text-muted-foreground shrink-0">{m.page_connect()}</span>
               </button>
             </div>
           {/if}
 
           <Button variant="outline" size="sm" onclick={() => (uiStore.profileManagerOpen = true)}>
-            Manage Profiles
+            {m.page_manage_profiles()}
           </Button>
         {/if}
       </div>
@@ -600,6 +867,14 @@
   {/if}
 
   <DragOverlay />
+  <FileDetailDialog
+    bind:open={fileDetailOpen}
+    profileId={activeProfileId ?? ''}
+    bucket={fileDetailBucket}
+    fileKey={fileDetailKey}
+    ondownload={handleFileDetailDownload}
+    oncopyurl={handleFileDetailCopyUrl}
+  />
   {#if confirmDialogOpen}
     <ConfirmDialog
       bind:open={confirmDialogOpen}
@@ -622,7 +897,8 @@
     bind:open={folderPickerOpen}
     profileId={activeProfileId ?? ''}
     bucket={fileState?.bucket ?? ''}
-    title="Move to..."
+    title={folderPickerTitle || m.page_move_to()}
+    confirmText={folderPickerConfirmText}
     onconfirm={folderPickerCallback}
   />
   <InputDialog
@@ -635,4 +911,23 @@
     onconfirm={inputDialogConfig.onconfirm}
     oncancel={() => {}}
   />
+  <UploadTypeDialog
+    bind:open={uploadTypeOpen}
+    onfiles={handleUploadFiles}
+    onfolder={handleUploadFolder}
+    oncancel={() => {}}
+  />
+  {#if conflictDialogOpen}
+    <ConflictDialog
+      bind:open={conflictDialogOpen}
+      conflicts={conflictKeys}
+      onresult={(result) => {
+        conflictCallback?.(result);
+        conflictCallback = null;
+      }}
+      oncancel={() => {
+        conflictCallback = null;
+      }}
+    />
+  {/if}
 </div>

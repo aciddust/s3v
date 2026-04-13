@@ -1,6 +1,6 @@
 [package]
 name = "s3v"
-version = "0.1.2"
+version = "0.4.4"
 description = "S3-compatible storage client"
 authors = []
 license = ""
@@ -35,6 +35,20 @@ urlencoding = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-http = "2"
 reqwest = { version = "0.13.2", features = ["json"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = [
+    "NSString", "NSURL", "NSArray", "NSError", "NSThread",
+    "NSDictionary", "NSObject",
+] }
+objc2-app-kit = { version = "0.3", features = [
+    "NSFilePromiseProvider", "NSDraggingItem", "NSDraggingSession",
+    "NSView", "NSWindow", "NSApplication", "NSEvent", "NSImage",
+    "NSPasteboard", "NSDragging", "NSWorkspace", "NSResponder",
+    "block2",
+] }
+block2 = "0.6"
 
 [patch.crates-io]
 wry = { path = "patches/wry" }

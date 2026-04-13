@@ -1,9 +1,11 @@
 .vscode
 .claude
+.playwright-mcp
 docs
 
 node_modules/
 build/
+target/
 .svelte-kit/
 src-tauri/target/
 .superpowers/

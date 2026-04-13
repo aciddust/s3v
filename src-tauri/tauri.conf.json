@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "s3v",
-  "version": "0.1.2",
+  "version": "0.4.4",
   "identifier": "com.acid.s3v",
   "build": {
     "frontendDist": "../build",
