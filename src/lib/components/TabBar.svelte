@@ -12,8 +12,16 @@
 
   const { ontabdrop }: Props = $props();
 
-  const tabs = $derived(profileStore.tabs);
-  const activeTabIndex = $derived(profileStore.activeTabIndex);
+  const allTabs = $derived(profileStore.tabs);
+  // Hide tabs that are "docked" in the right panel
+  const hiddenProfileId = $derived(
+    uiStore.dualPanel ? uiStore.rightPanelProfileId : null,
+  );
+  const tabs = $derived(
+    hiddenProfileId
+      ? allTabs.filter((t) => t.profileId !== hiddenProfileId)
+      : allTabs,
+  );
 
   let scrollEl: HTMLDivElement | undefined = $state();
   let canScrollLeft = $state(false);
@@ -79,11 +87,11 @@
     class="flex flex-1 items-end overflow-x-hidden"
     onscroll={updateScrollState}
   >
-    {#each tabs as tab, i}
+    {#each tabs as tab}
       <ProfileTab
         name={tab.profile.name}
         provider={tab.profile.provider}
-        active={i === activeTabIndex}
+        active={tab.profileId === profileStore.activeProfileId}
         status={tab.status}
         profileId={tab.profileId}
         droppable={dragStore.active && dragStore.payload?.profileId?.replace(/::right$/, '') !== tab.profileId}

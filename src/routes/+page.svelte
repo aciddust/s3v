@@ -19,6 +19,7 @@
   import InputDialog from '$lib/components/InputDialog.svelte';
   import FolderPicker from '$lib/components/FolderPicker.svelte';
   import DragOverlay from '$lib/components/DragOverlay.svelte';
+  import TabDragOverlay from '$lib/components/TabDragOverlay.svelte';
   import FileDetailDialog from '$lib/components/FileDetailDialog.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import type { ConfirmAction } from '$lib/components/ConfirmDialog.svelte';
@@ -66,12 +67,17 @@
   const activeTab = $derived(profileStore.activeTab);
   const activeProfileId = $derived(profileStore.activeProfileId);
   const activePanel = $derived(uiStore.activePanel);
+  const rightProfileId = $derived(uiStore.rightPanelProfileId);
   const activeStoreId = $derived(
     activeProfileId
       ? uiStore.dualPanel && activePanel === 'right'
-        ? `${activeProfileId}::right`
+        ? `${rightProfileId ?? activeProfileId}::right`
         : activeProfileId
       : null,
+  );
+  /** The profileId to use for S3 API calls on the currently active panel */
+  const activeOpProfileId = $derived(
+    activeStoreId ? activeStoreId.replace(/::right$/, '') : null,
   );
   const leftFileState = $derived(activeProfileId ? fileStore.getState(activeProfileId) : null);
   const fileState = $derived(activeStoreId ? fileStore.getState(activeStoreId) : null);
@@ -105,14 +111,14 @@
   }
 
   async function handleFileDetailDownload(key: string) {
-    if (!activeProfileId) return;
+    if (!activeOpProfileId) return;
     fileDetailOpen = false;
     try {
       const destDir = await open({ multiple: false, directory: true });
       if (!destDir) return;
       const dir = Array.isArray(destDir) ? destDir[0] : destDir;
       const filename = key.split('/').pop() || key;
-      await enqueueDownload(activeProfileId, fileDetailBucket, key, `${dir}/${filename}`);
+      await enqueueDownload(activeOpProfileId, fileDetailBucket, key, `${dir}/${filename}`);
       if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
     } catch (e) {
       console.error('Download failed:', e);
@@ -120,9 +126,9 @@
   }
 
   async function handleFileDetailCopyUrl(key: string) {
-    if (!activeProfileId) return;
+    if (!activeOpProfileId) return;
     try {
-      const url = await getPresignedUrl(activeProfileId, fileDetailBucket, key, 3600);
+      const url = await getPresignedUrl(activeOpProfileId, fileDetailBucket, key, 3600);
       await writeText(url);
       toast.success(m.file_detail_url_copied());
     } catch (e) {
@@ -241,7 +247,15 @@
       }
     });
 
+    function handleInternalTabDrop(e: Event) {
+      const detail = (e as CustomEvent<{ profileId: string; side: 'left' | 'right' }>).detail;
+      if (!detail) return;
+      handlePanelTabDrop(detail.side, detail.profileId);
+    }
+    document.addEventListener('internaltabdrop', handleInternalTabDrop);
+
     return () => {
+      document.removeEventListener('internaltabdrop', handleInternalTabDrop);
       unlistenUploadDone.then((fn) => fn());
       unlistenTransferAdded.then((fn) => fn());
       unlistenFolderOpAdded.then((fn) => fn());
@@ -262,13 +276,13 @@
 
   // --- Handlers ---
   function handleDelete() {
-    if (!activeProfileId || !activeStoreId || !fileState) return;
+    if (!activeOpProfileId || !activeStoreId || !fileState) return;
     if (fileState.selected.size === 0) {
       toast.warning(m.page_select_to_delete());
       return;
     }
     const keys = [...fileState.selected];
-    const pid = activeProfileId;
+    const pid = activeOpProfileId;
     const bkt = fileState.bucket;
     const storeId = activeStoreId;
     showConfirm('delete', keys, async () => {
@@ -282,17 +296,18 @@
   }
 
   function handleNewFolder() {
-    if (!activeProfileId || !activeStoreId || !fileState || !fileState.bucket) return;
+    if (!activeOpProfileId || !activeStoreId || !fileState || !fileState.bucket) return;
     const storeId = activeStoreId;
+    const pid = activeOpProfileId;
     showInputDialog({
       title: m.page_new_folder(),
       placeholder: m.page_folder_placeholder(),
       confirmText: m.page_create(),
       onconfirm: async (name) => {
-        if (!activeProfileId || !fileState) return;
+        if (!pid || !fileState) return;
         const folderPrefix = fileState.prefix + name.replace(/\/$/, '') + '/';
         try {
-          await createFolder(activeProfileId, fileState.bucket, folderPrefix);
+          await createFolder(pid, fileState.bucket, folderPrefix);
           await fileStore.refresh(storeId);
         } catch (e) {
           console.error('Create folder failed:', e);
@@ -302,11 +317,11 @@
   }
 
   function handleRename() {
-    if (!activeProfileId || !activeStoreId || !fileState || fileState.selected.size !== 1) return;
+    if (!activeOpProfileId || !activeStoreId || !fileState || fileState.selected.size !== 1) return;
     const storeId = activeStoreId;
+    const pid = activeOpProfileId;
     const oldKey = [...fileState.selected][0];
     const isDir = oldKey.endsWith('/');
-    // "a/b/test/" → "test", "a/b/file.txt" → "file.txt"
     const parts = oldKey.replace(/\/$/, '').split('/');
     const oldName = parts.at(-1) ?? oldKey;
     showInputDialog({
@@ -314,17 +329,17 @@
       defaultValue: oldName,
       confirmText: m.page_rename(),
       onconfirm: async (newName) => {
-        if (!activeProfileId || !fileState || newName === oldName) return;
+        if (!pid || !fileState || newName === oldName) return;
         try {
           if (isDir) {
             const parentPrefix = parts.slice(0, -1).join('/');
             const oldPrefix = oldKey;
             const newPrefix = (parentPrefix ? parentPrefix + '/' : '') + newName + '/';
-            await renameFolder(activeProfileId, fileState.bucket, oldPrefix, newPrefix);
+            await renameFolder(pid, fileState.bucket, oldPrefix, newPrefix);
           } else {
             const prefix = oldKey.substring(0, oldKey.lastIndexOf('/') + 1);
             const newKey = prefix + newName;
-            await renameObject(activeProfileId, fileState.bucket, oldKey, newKey);
+            await renameObject(pid, fileState.bucket, oldKey, newKey);
           }
           await fileStore.refresh(storeId);
         } catch (e) {
@@ -335,7 +350,7 @@
   }
 
   function handleUpload() {
-    if (!activeProfileId || !fileState || !fileState.bucket) {
+    if (!activeOpProfileId || !fileState || !fileState.bucket) {
       console.warn('Upload: no active profile or bucket');
       return;
     }
@@ -343,7 +358,7 @@
   }
 
   async function handleUploadFiles() {
-    if (!activeProfileId || !fileState || !fileState.bucket) return;
+    if (!activeOpProfileId || !fileState || !fileState.bucket) return;
     try {
       const selected = await open({
         multiple: true,
@@ -352,7 +367,7 @@
       if (!selected) return;
       const paths = Array.isArray(selected) ? selected : [selected];
       const fileNames = paths.map((p) => String(p).split(/[\\/]/).at(-1) ?? String(p));
-      const pid = activeProfileId;
+      const pid = activeOpProfileId;
       const bucket = fileState.bucket;
       const prefix = fileState.prefix;
       showConfirm('upload', fileNames, async () => {
@@ -373,7 +388,7 @@
   }
 
   async function handleUploadFolder() {
-    if (!activeProfileId || !fileState || !fileState.bucket) return;
+    if (!activeOpProfileId || !fileState || !fileState.bucket) return;
     try {
       const selected = await open({
         multiple: false,
@@ -382,7 +397,7 @@
       if (!selected) return;
       const localDir = Array.isArray(selected) ? selected[0] : selected;
       const dirName = String(localDir).split(/[\\/]/).at(-1) ?? String(localDir);
-      const pid = activeProfileId;
+      const pid = activeOpProfileId;
       const bucket = fileState.bucket;
       const remotePrefix = fileState.prefix + dirName + '/';
 
@@ -415,7 +430,7 @@
   }
 
   async function handleDownload() {
-    if (!activeProfileId || !fileState) return;
+    if (!activeOpProfileId || !fileState) return;
     const selected = Array.from(fileState.selected);
     if (selected.length === 0) {
       toast.warning(m.page_select_to_download());
@@ -430,13 +445,12 @@
       const dir = Array.isArray(destDir) ? destDir[0] : destDir;
       for (const key of selected) {
         if (key.endsWith('/')) {
-          // Include folder name in local path: "photos/" → dir/photos/
           const folderName = key.slice(0, -1).split('/').pop() || '';
           const folderDest = `${dir}/${folderName}`;
-          await enqueueFolderDownload(activeProfileId, fileState.bucket, key, folderDest);
+          await enqueueFolderDownload(activeOpProfileId, fileState.bucket, key, folderDest);
         } else {
           const filename = key.split('/').pop() || key;
-          await enqueueDownload(activeProfileId, fileState.bucket, key, `${dir}/${filename}`);
+          await enqueueDownload(activeOpProfileId, fileState.bucket, key, `${dir}/${filename}`);
         }
       }
       if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
@@ -447,7 +461,7 @@
   }
 
   async function handleShare() {
-    if (!activeProfileId || !fileState) return;
+    if (!activeOpProfileId || !fileState) return;
     if (fileState.selected.size !== 1) {
       toast.warning(m.page_select_one_to_share());
       return;
@@ -458,7 +472,7 @@
       return;
     }
     try {
-      const url = await getPresignedUrl(activeProfileId, fileState.bucket, shareKey, 3600);
+      const url = await getPresignedUrl(activeOpProfileId, fileState.bucket, shareKey, 3600);
       await writeText(url);
       toast.success(m.page_url_copied());
     } catch (e) {
@@ -468,13 +482,13 @@
   }
 
   function handleMove() {
-    if (!activeProfileId || !activeStoreId || !fileState) return;
+    if (!activeOpProfileId || !activeStoreId || !fileState) return;
     if (fileState.selected.size === 0) {
       toast.warning(m.page_select_to_move());
       return;
     }
     const keys = [...fileState.selected];
-    const pid = activeProfileId;
+    const pid = activeOpProfileId;
     const storeId = activeStoreId;
     const bkt = fileState.bucket;
     folderPickerCallback = async (destPrefix: string) => {
@@ -590,11 +604,11 @@
   }
 
   async function handleCopy() {
-    if (!activeProfileId || !activeStoreId || !fileState) return;
+    if (!activeOpProfileId || !activeStoreId || !fileState) return;
     const selected = Array.from(fileState.selected);
     if (selected.length === 0) return;
 
-    const pid = activeProfileId;
+    const pid = activeOpProfileId;
     const bkt = fileState.bucket;
     const storeId = activeStoreId;
     folderPickerCallback = async (destPrefix: string) => {
@@ -685,8 +699,8 @@
   }
 
   function handleMoveToPrefix(bucket: string, destPrefix: string, keys: string[]) {
-    if (!activeProfileId) return;
-    const pid = activeProfileId;
+    if (!activeOpProfileId) return;
+    const pid = activeOpProfileId;
     showConfirm('move', keys, async () => {
       if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
       try {
@@ -770,24 +784,69 @@
     });
   }
 
+  async function handlePanelTabDrop(side: 'left' | 'right', droppedProfileId: string) {
+    const isDual = uiStore.dualPanel;
+    const droppedTab = profileStore.tabs.find((t) => t.profileId === droppedProfileId);
+
+    if (side === 'right') {
+      uiStore.setRightPanelProfile(droppedProfileId);
+      if (!isDual) {
+        uiStore.dualPanel = true;
+      }
+      if (droppedTab?.buckets.length) {
+        const ok = await fileStore.navigate(`${droppedProfileId}::right`, droppedTab.buckets[0].name, '');
+        if (!ok) {
+          toast.error(m.page_connection_failed?.() ?? `Failed to connect to "${droppedTab.profile.name}". Please check the connection settings.`);
+          uiStore.setRightPanelProfile(null);
+          if (!isDual) uiStore.dualPanel = false;
+        }
+      }
+    } else {
+      // Preserve the right panel's current profile before switching left
+      const prevProfileId = activeProfileId;
+      if (!isDual) {
+        // Single → dual: push current to right, set dropped to left
+        if (prevProfileId) {
+          const currentState = fileStore.getState(prevProfileId);
+          uiStore.setRightPanelProfile(prevProfileId);
+          uiStore.dualPanel = true;
+          if (currentState.bucket) {
+            fileStore.navigate(`${prevProfileId}::right`, currentState.bucket, currentState.prefix);
+          }
+        }
+      } else if (!rightProfileId && prevProfileId && prevProfileId !== droppedProfileId) {
+        // Dual with shared profile → pin the current profile to right before switching left
+        const currentRightState = fileStore.getState(`${prevProfileId}::right`);
+        uiStore.setRightPanelProfile(prevProfileId);
+        if (currentRightState.bucket) {
+          fileStore.navigate(`${prevProfileId}::right`, currentRightState.bucket, currentRightState.prefix);
+        }
+      }
+      profileStore.setActiveTab(droppedProfileId);
+    }
+  }
+
   async function handleFileDrop(paths: string[], position?: { x: number; y: number }) {
     if (!paths.length || !activeProfileId) return;
 
-    // Determine target panel based on drop position
+    // Determine target panel and profileId based on drop position
     let targetState = fileState;
+    let dropProfileId: string = activeOpProfileId ?? activeProfileId;
     if (uiStore.dualPanel && position && activeProfileId) {
       const sidebarAndHandle = uiStore.sidebarWidth + 4; // sidebar + resize handle
       const panelAreaX = position.x - sidebarAndHandle;
       const panelAreaWidth = window.innerWidth - sidebarAndHandle;
       const droppedOnRight = panelAreaX > panelAreaWidth / 2;
+      const rightPid = rightProfileId ?? activeProfileId;
       targetState = droppedOnRight
-        ? fileStore.getState(`${activeProfileId}::right`)
+        ? fileStore.getState(`${rightPid}::right`)
         : fileStore.getState(activeProfileId);
+      dropProfileId = droppedOnRight ? rightPid : activeProfileId;
     }
 
     if (!targetState || !targetState.bucket) return;
 
-    const pid = activeProfileId;
+    const pid = dropProfileId;
     const bucket = targetState.bucket;
     const prefix = targetState.prefix;
 
@@ -862,6 +921,10 @@
         buckets={activeTab.buckets}
         activeBucket={leftFileState.bucket}
         activePrefix={leftFileState.prefix}
+        rightProfileId={uiStore.rightPanelProfileId ?? undefined}
+        rightProfileName={uiStore.rightPanelProfileId
+          ? profileStore.tabs.find(t => t.profileId === uiStore.rightPanelProfileId)?.profile.name
+          : undefined}
         onnavigate={handleNavigate}
         oncontextmenu={handleContextMenu}
         onbgcontextmenu={handleBgContextMenu}
@@ -950,6 +1013,7 @@
   {/if}
 
   <DragOverlay />
+  <TabDragOverlay />
   <FileDetailDialog
     bind:open={fileDetailOpen}
     profileId={activeProfileId ?? ''}

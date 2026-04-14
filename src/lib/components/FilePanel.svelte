@@ -1,12 +1,15 @@
 <script lang="ts">
   import { uiStore } from '$lib/stores/ui.svelte';
   import { fileStore } from '$lib/stores/files.svelte';
+  import { dragStore } from '$lib/stores/drag.svelte';
 
   import Breadcrumb from './Breadcrumb.svelte';
   import FileList from './FileList.svelte';
 
   interface Props {
     profileId: string;
+    rightProfileId?: string;
+    rightProfileName?: string;
     onnavigate: (bucket: string, prefix: string) => void;
     oncontextmenu: (e: MouseEvent, keys: string[]) => void;
     onbgcontextmenu?: (e: MouseEvent) => void;
@@ -23,6 +26,8 @@
 
   const {
     profileId,
+    rightProfileId,
+    rightProfileName,
     onnavigate,
     oncontextmenu,
     onbgcontextmenu,
@@ -32,15 +37,18 @@
   }: Props = $props();
 
   const leftState = $derived(fileStore.getState(profileId));
-  const rightPanelId = $derived(`${profileId}::right`);
+  const effectiveRightProfileId = $derived(rightProfileId ?? profileId);
+  const rightPanelId = $derived(`${effectiveRightProfileId}::right`);
   const rightState = $derived(fileStore.getState(rightPanelId));
   const dualPanel = $derived(uiStore.dualPanel);
   const activePanel = $derived(uiStore.activePanel);
+  const tabDragActive = $derived(dragStore.tabDragActive);
+  const hoverPanelSide = $derived(dragStore.hoverPanelSide);
 
-  // Initialize right panel when dual panel mode is enabled
+  // Initialize right panel when dual panel mode is enabled (only if no independent profile)
   let prevDualPanel = $state(false);
   $effect(() => {
-    if (dualPanel && !prevDualPanel) {
+    if (dualPanel && !prevDualPanel && !rightProfileId) {
       fileStore.initRightPanel(profileId);
     }
     prevDualPanel = dualPanel;
@@ -54,7 +62,7 @@
   }
 
   function navigateRight(bucket: string, prefix: string) {
-    fileStore.navigate(`${profileId}::right`, bucket, prefix);
+    fileStore.navigate(rightPanelId, bucket, prefix);
     if (activePanel === 'right') {
       onnavigate(bucket, prefix);
     }
@@ -85,7 +93,8 @@
     <div class="flex flex-1 overflow-hidden">
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
-        class="flex flex-1 flex-col overflow-hidden border-r border-border {activePanel === 'left'
+        data-panel-side="left"
+        class="relative flex flex-1 flex-col overflow-hidden border-r border-border {activePanel === 'left'
           ? 'ring-1 ring-primary/40 ring-inset'
           : ''}"
         onmousedown={activateLeft}
@@ -107,10 +116,14 @@
           {oncopytoprefix}
           {onfileopen}
         />
+        {#if tabDragActive && hoverPanelSide === 'left'}
+          <div class="absolute inset-0 bg-primary/10 ring-2 ring-primary ring-inset pointer-events-none z-10"></div>
+        {/if}
       </div>
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
-        class="flex flex-1 flex-col overflow-hidden {activePanel === 'right'
+        data-panel-side="right"
+        class="relative flex flex-1 flex-col overflow-hidden {activePanel === 'right'
           ? 'ring-1 ring-primary/40 ring-inset'
           : ''}"
         onmousedown={activateRight}
@@ -118,13 +131,14 @@
         onfocusin={activateRight}
       >
         <Breadcrumb
-          {profileId}
+          profileId={effectiveRightProfileId}
           bucket={rightState.bucket}
           prefix={rightState.prefix}
           onnavigate={navigateRight}
+          profileName={rightProfileId ? rightProfileName : undefined}
         />
         <FileList
-          profileId={`${profileId}::right`}
+          profileId={rightPanelId}
           onnavigate={navigateRight}
           {oncontextmenu}
           {onbgcontextmenu}
@@ -132,6 +146,9 @@
           {oncopytoprefix}
           {onfileopen}
         />
+        {#if tabDragActive && hoverPanelSide === 'right'}
+          <div class="absolute inset-0 bg-primary/10 ring-2 ring-primary ring-inset pointer-events-none z-10"></div>
+        {/if}
       </div>
     </div>
   {:else}
@@ -144,7 +161,7 @@
     />
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="flex flex-1 flex-col overflow-hidden min-h-0"
+      class="relative flex flex-1 flex-col overflow-hidden min-h-0"
       onmouseup={(e) => handleMouseNav(e, profileId)}
     >
       <FileList
@@ -156,6 +173,13 @@
         {oncopytoprefix}
         {onfileopen}
       />
+      {#if tabDragActive && hoverPanelSide}
+        <div class="absolute inset-0 flex pointer-events-none z-10">
+          <div class="flex-1 {hoverPanelSide === 'left' ? 'bg-primary/10 ring-2 ring-primary ring-inset' : ''}"></div>
+          <div class="w-px bg-border"></div>
+          <div class="flex-1 {hoverPanelSide === 'right' ? 'bg-primary/10 ring-2 ring-primary ring-inset' : ''}"></div>
+        </div>
+      {/if}
     </div>
   {/if}
 </div>

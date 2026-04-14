@@ -9,6 +9,8 @@
     buckets: BucketInfo[];
     activeBucket: string;
     activePrefix: string;
+    rightProfileId?: string;
+    rightProfileName?: string;
     onnavigate: (bucket: string, prefix: string) => void;
     oncontextmenu: (e: MouseEvent, keys: string[]) => void;
     onbgcontextmenu?: (e: MouseEvent) => void;
@@ -28,6 +30,8 @@
     buckets,
     activeBucket,
     activePrefix,
+    rightProfileId,
+    rightProfileName,
     onnavigate,
     oncontextmenu,
     onbgcontextmenu,
@@ -74,9 +78,11 @@
   ></div>
 
   <!-- File panel -->
-  <div class="flex flex-1 flex-col overflow-hidden">
+  <div class="flex flex-1 flex-col overflow-hidden" data-main-area>
     <FilePanel
       {profileId}
+      {rightProfileId}
+      {rightProfileName}
       {onnavigate}
       {oncontextmenu}
       {onbgcontextmenu}

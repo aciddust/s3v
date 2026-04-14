@@ -13,6 +13,10 @@ export interface DragPayload {
   sourcePrefix: string;
 }
 
+export interface TabDragPayload {
+  profileId: string;
+}
+
 const EDGE_THRESHOLD = 20;
 
 class DragStore {
@@ -29,6 +33,13 @@ class DragStore {
   hoverTabProfileId = $state<string | null>(null);
   /** Whether the hovered tab accepts drops (same profile as drag source) */
   hoverTabDroppable = $state(false);
+  /** Tab drag state (separate from file drag) */
+  tabDragPayload = $state<TabDragPayload | null>(null);
+  tabDragActive = $state(false);
+  tabDragX = $state(0);
+  tabDragY = $state(0);
+  /** Which panel side is being hovered during tab drag */
+  hoverPanelSide = $state<'left' | 'right' | null>(null);
   private isMac = navigator.platform.toUpperCase().includes('MAC');
 
   start(data: DragPayload, e: MouseEvent): void {
@@ -162,6 +173,70 @@ class DragStore {
     this.hoverTabProfileId = null;
     this.hoverTabDroppable = false;
     return data;
+  }
+
+  startTabDrag(data: TabDragPayload, e: MouseEvent): void {
+    this.tabDragPayload = data;
+    this.tabDragActive = true;
+    this.tabDragX = e.clientX;
+    this.tabDragY = e.clientY;
+    this.hoverPanelSide = null;
+
+    const onMove = (me: MouseEvent) => {
+      this.tabDragX = me.clientX;
+      this.tabDragY = me.clientY;
+
+      // Detect panel side from DOM
+      const el = document.elementFromPoint(me.clientX, me.clientY) as HTMLElement | null;
+      const panelEl = el?.closest('[data-panel-side]') as HTMLElement | null;
+      if (panelEl) {
+        this.hoverPanelSide = panelEl.dataset.panelSide as 'left' | 'right';
+      } else {
+        // In single panel mode, use horizontal center of the main content area
+        const mainArea = document.querySelector('[data-main-area]') as HTMLElement | null;
+        if (mainArea) {
+          const rect = mainArea.getBoundingClientRect();
+          const isInside = me.clientX >= rect.left && me.clientX <= rect.right &&
+                           me.clientY >= rect.top && me.clientY <= rect.bottom;
+          if (isInside) {
+            this.hoverPanelSide = me.clientX < rect.left + rect.width / 2 ? 'left' : 'right';
+          } else {
+            this.hoverPanelSide = null;
+          }
+        } else {
+          this.hoverPanelSide = null;
+        }
+      }
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+
+      if (this.hoverPanelSide && this.tabDragPayload) {
+        const dropTarget = document.elementFromPoint(this.tabDragX, this.tabDragY);
+        if (dropTarget) {
+          dropTarget.dispatchEvent(
+            new CustomEvent('internaltabdrop', {
+              bubbles: true,
+              detail: {
+                profileId: this.tabDragPayload.profileId,
+                side: this.hoverPanelSide,
+              },
+            }),
+          );
+        }
+      }
+
+      this.tabDragPayload = null;
+      this.tabDragActive = false;
+      this.tabDragX = 0;
+      this.tabDragY = 0;
+      this.hoverPanelSide = null;
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   }
 }
 

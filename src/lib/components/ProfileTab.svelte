@@ -2,6 +2,7 @@
   import type { Provider } from '$lib/api/profiles';
   import type { ConnectionStatus } from '$lib/stores/profiles.svelte';
   import { X } from '@lucide/svelte';
+  import { dragStore } from '$lib/stores/drag.svelte';
 
   interface Props {
     name: string;
@@ -54,6 +55,44 @@
     }
     return () => clearTimeout(hoverTimer);
   });
+
+  let mouseDownPos: { x: number; y: number } | null = null;
+  let isDraggingTab = false;
+  const DRAG_THRESHOLD = 5;
+
+  function handleMouseDown(e: MouseEvent) {
+    // Ignore right-click and close button
+    if (e.button !== 0) return;
+    mouseDownPos = { x: e.clientX, y: e.clientY };
+    isDraggingTab = false;
+
+    const onMove = (me: MouseEvent) => {
+      if (!mouseDownPos) return;
+      const dx = me.clientX - mouseDownPos.x;
+      const dy = me.clientY - mouseDownPos.y;
+      if (Math.sqrt(dx * dx + dy * dy) >= DRAG_THRESHOLD && !isDraggingTab) {
+        isDraggingTab = true;
+        dragStore.startTabDrag({ profileId }, me);
+        // Clean up local listeners — DragStore takes over
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        mouseDownPos = null;
+      }
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      if (!isDraggingTab) {
+        onactivate();
+      }
+      mouseDownPos = null;
+      isDraggingTab = false;
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
 </script>
 
 <!-- Use a div to avoid nested-button HTML violation -->
@@ -68,7 +107,7 @@
     ? 'bg-background text-foreground'
     : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'}
     {dragClass}"
-  onclick={onactivate}
+  onmousedown={handleMouseDown}
   onkeydown={(e) => e.key === 'Enter' && onactivate()}
   title={name}
 >

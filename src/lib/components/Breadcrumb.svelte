@@ -10,9 +10,18 @@
     bucket: string;
     prefix: string;
     onnavigate: (bucket: string, prefix: string) => void;
+    profileName?: string;
+    profileProvider?: string;
   }
 
-  const { profileId, bucket, prefix, onnavigate }: Props = $props();
+  const { profileId, bucket, prefix, onnavigate, profileName, profileProvider }: Props = $props();
+
+  const providerColors: Record<string, string> = {
+    aws: 'bg-amber-500',
+    minio: 'bg-red-500',
+    r2: 'bg-orange-500',
+    custom: 'bg-blue-500',
+  };
 
   // Build path segments from prefix
   const segments = $derived(() => {
@@ -48,6 +57,13 @@
 
 <div class="flex h-8 items-center gap-1 border-b border-border bg-background px-2 text-xs">
   {#if bucket}
+    {#if profileName}
+      <span class="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
+        <span class="h-1.5 w-1.5 rounded-full {providerColors[profileProvider ?? 'custom'] ?? 'bg-blue-500'}"></span>
+        <span class="text-[10px]">{profileName}</span>
+      </span>
+      <span class="text-muted-foreground">/</span>
+    {/if}
     <!-- Bucket root -->
     <button
       class="rounded px-1.5 py-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"

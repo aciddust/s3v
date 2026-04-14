@@ -22,6 +22,7 @@ class UIStore {
   transferPanelExpanded = $state<boolean>(true);
   searchQuery = $state<string>('');
   profileManagerOpen = $state<boolean>(false);
+  rightPanelProfileId = $state<string | null>(null);
 
   contextMenu = $state<ContextMenuState>({
     open: false,
@@ -34,11 +35,16 @@ class UIStore {
     this.dualPanel = !this.dualPanel;
     if (!this.dualPanel) {
       this.activePanel = 'left';
+      this.rightPanelProfileId = null;
     }
   }
 
   setActivePanel(side: PanelSide): void {
     this.activePanel = side;
+  }
+
+  setRightPanelProfile(profileId: string | null): void {
+    this.rightPanelProfileId = profileId;
   }
 
   toggleTransferPanel(): void {

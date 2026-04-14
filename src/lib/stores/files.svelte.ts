@@ -1,4 +1,5 @@
 import { listObjects, type S3Object } from '$lib/api/s3';
+import { toast } from 'svelte-sonner';
 
 export type SortField = 'name' | 'size' | 'lastModified';
 export type SortOrder = 'asc' | 'desc';
@@ -61,7 +62,7 @@ class FileStore {
     this.stateMap = next;
   }
 
-  async navigate(storeKey: string, bucket: string, prefix: string, skipHistory = false): Promise<void> {
+  async navigate(storeKey: string, bucket: string, prefix: string, skipHistory = false): Promise<boolean> {
     const profileId = this.resolveProfileId(storeKey);
     const current = this.getState(storeKey);
 
@@ -93,6 +94,7 @@ class FileStore {
         continuationToken: result.next_continuation_token,
         hasMore: result.is_truncated,
       });
+      return true;
     } catch (e) {
       console.error('[files] navigate failed:', e);
       this.updateState(storeKey, {
@@ -101,6 +103,8 @@ class FileStore {
         loading: false,
         hasMore: false,
       });
+      toast.error(String(e));
+      return false;
     }
   }
 
