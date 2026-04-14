@@ -17,6 +17,7 @@
     onmovetoprefix?: (bucket: string, destPrefix: string, keys: string[]) => void;
     oncopytoprefix?: (
       sourceProfileId: string,
+      destProfileId: string,
       sourceBucket: string,
       destBucket: string,
       destPrefix: string,

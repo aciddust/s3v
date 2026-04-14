@@ -645,13 +645,12 @@
 
   function handleCopyToPrefix(
     sourceProfileId: string,
+    destProfileId: string,
     sourceBucket: string,
     destBucket: string,
     destPrefix: string,
     keys: string[],
   ) {
-    if (!activeProfileId) return;
-    const destProfileId = activeProfileId;
     const isCrossProfile = sourceProfileId !== destProfileId;
     showConfirm('copy', keys, async () => {
       if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();

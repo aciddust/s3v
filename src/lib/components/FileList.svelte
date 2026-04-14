@@ -16,6 +16,7 @@
     onmovetoprefix?: (bucket: string, destPrefix: string, keys: string[]) => void;
     oncopytoprefix?: (
       sourceProfileId: string,
+      destProfileId: string,
       sourceBucket: string,
       destBucket: string,
       destPrefix: string,
@@ -114,16 +115,17 @@
     if (sameBucket && data.keys.some((k) => k === destPrefix)) return;
 
     const sourceProfileId = data.profileId.replace(/::right$/, '');
+    const destProfileId = profileId.replace(/::right$/, '');
 
     if (isCross) {
       if (modifier === 'shift') {
         onmovetoprefix?.(data.bucket, destPrefix, data.keys);
       } else {
-        oncopytoprefix?.(sourceProfileId, data.bucket, fs.bucket, destPrefix, data.keys);
+        oncopytoprefix?.(sourceProfileId, destProfileId, data.bucket, fs.bucket, destPrefix, data.keys);
       }
     } else {
       if (modifier === 'meta') {
-        oncopytoprefix?.(sourceProfileId, data.bucket, fs.bucket, destPrefix, data.keys);
+        oncopytoprefix?.(sourceProfileId, destProfileId, data.bucket, fs.bucket, destPrefix, data.keys);
       } else {
         onmovetoprefix?.(data.bucket, destPrefix, data.keys);
       }
