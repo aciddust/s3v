@@ -40,7 +40,9 @@
       {#each locales as tag}
         <button
           class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors
-            {selected === tag ? 'bg-primary/10 text-primary' : 'hover:bg-accent/30 text-foreground'}"
+            {selected === tag
+            ? 'bg-primary/10 text-primary'
+            : 'hover:bg-accent/30 text-foreground'}"
           onclick={() => (selected = tag)}
         >
           <span
@@ -57,7 +59,8 @@
     </div>
 
     <div class="flex justify-end gap-2 pt-1">
-      <Button variant="ghost" size="sm" onclick={() => (open = false)}>{m.language_cancel()}</Button>
+      <Button variant="ghost" size="sm" onclick={() => (open = false)}>{m.language_cancel()}</Button
+      >
       <Button size="sm" onclick={handleOk}>{m.language_ok()}</Button>
     </div>
   </DialogContent>

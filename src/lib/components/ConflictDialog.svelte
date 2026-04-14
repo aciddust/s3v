@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '$lib/components/ui/dialog';
+  import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+  } from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import * as m from '$lib/paraglide/messages';
 
@@ -66,12 +72,19 @@
     <ul class="max-h-64 overflow-y-auto space-y-1 pr-1">
       {#each conflicts as key (key)}
         <li class="flex items-center gap-2 rounded px-2 py-1 bg-muted/40">
-          <span class="truncate text-xs text-foreground flex-1" title={key}>{displayName(key)}</span>
+          <span class="truncate text-xs text-foreground flex-1" title={key}>{displayName(key)}</span
+          >
           <select
             class="shrink-0 rounded border border-input bg-background px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             value={actions[key]}
             onchange={(e) => {
-              actions = { ...actions, [key]: (e.currentTarget as HTMLSelectElement).value as 'overwrite' | 'skip' | 'rename' };
+              actions = {
+                ...actions,
+                [key]: (e.currentTarget as HTMLSelectElement).value as
+                  | 'overwrite'
+                  | 'skip'
+                  | 'rename',
+              };
             }}
           >
             <option value="overwrite">{m.conflict_overwrite()}</option>
@@ -84,9 +97,15 @@
 
     <div class="flex items-center gap-2 pt-1">
       <span class="text-xs text-muted-foreground">{m.conflict_apply_all()}</span>
-      <Button variant="outline" size="sm" onclick={() => applyAll('overwrite')}>{m.conflict_overwrite()}</Button>
-      <Button variant="outline" size="sm" onclick={() => applyAll('skip')}>{m.conflict_skip()}</Button>
-      <Button variant="outline" size="sm" onclick={() => applyAll('rename')}>{m.conflict_rename()}</Button>
+      <Button variant="outline" size="sm" onclick={() => applyAll('overwrite')}
+        >{m.conflict_overwrite()}</Button
+      >
+      <Button variant="outline" size="sm" onclick={() => applyAll('skip')}
+        >{m.conflict_skip()}</Button
+      >
+      <Button variant="outline" size="sm" onclick={() => applyAll('rename')}
+        >{m.conflict_rename()}</Button
+      >
     </div>
 
     <div class="flex justify-end gap-2 pt-1">

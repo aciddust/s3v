@@ -16,11 +16,21 @@
     onclose: () => void;
   }
 
-  const { name, provider, active, status, profileId, droppable, dragHover, onactivate, onclose }: Props = $props();
+  const {
+    name,
+    provider,
+    active,
+    status,
+    profileId,
+    droppable,
+    dragHover,
+    onactivate,
+    onclose,
+  }: Props = $props();
 
   const providerColors: Record<Provider, string> = {
     aws: 'bg-amber-500',
-    minio: 'bg-red-500',
+    rustfs: 'bg-red-500',
     r2: 'bg-orange-500',
     custom: 'bg-blue-500',
   };

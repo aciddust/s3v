@@ -18,7 +18,7 @@
 
   const providerColors: Record<string, string> = {
     aws: 'bg-amber-500',
-    minio: 'bg-red-500',
+    rustfs: 'bg-red-500',
     r2: 'bg-orange-500',
     custom: 'bg-blue-500',
   };
@@ -59,7 +59,10 @@
   {#if bucket}
     {#if profileName}
       <span class="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
-        <span class="h-1.5 w-1.5 rounded-full {providerColors[profileProvider ?? 'custom'] ?? 'bg-blue-500'}"></span>
+        <span
+          class="h-1.5 w-1.5 rounded-full {providerColors[profileProvider ?? 'custom'] ??
+            'bg-blue-500'}"
+        ></span>
         <span class="text-[10px]">{profileName}</span>
       </span>
       <span class="text-muted-foreground">/</span>

@@ -4,10 +4,13 @@
   import * as m from '$lib/paraglide/messages';
 
   const modifierLabel = $derived(
-    dragStore.nearEdge ? m.drag_download() :
-    dragStore.modifierKey === 'meta' ? m.drag_copy() :
-    dragStore.modifierKey === 'shift' ? m.drag_move() :
-    null
+    dragStore.nearEdge
+      ? m.drag_download()
+      : dragStore.modifierKey === 'meta'
+        ? m.drag_copy()
+        : dragStore.modifierKey === 'shift'
+          ? m.drag_move()
+          : null,
   );
 </script>
 

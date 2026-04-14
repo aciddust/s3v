@@ -44,6 +44,7 @@
   };
 
   $effect(() => {
+    // oxlint-disable-next-line no-unused-expressions
     logStore.entries.length;
     if (scrollRef) {
       requestAnimationFrame(() => {
@@ -77,7 +78,9 @@
     <!-- Resize handle -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="h-2 cursor-row-resize hover:bg-primary/20 transition-colors duration-200 shrink-0 {resizing ? 'bg-primary/30' : ''}"
+      class="h-2 cursor-row-resize hover:bg-primary/20 transition-colors duration-200 shrink-0 {resizing
+        ? 'bg-primary/30'
+        : ''}"
       onmousedown={startResize}
     ></div>
     <!-- Header -->

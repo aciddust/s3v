@@ -18,7 +18,7 @@ pub struct Profile {
 #[serde(rename_all = "lowercase")]
 pub enum Provider {
     Aws,
-    Minio,
+    Rustfs,
     R2,
     Custom,
 }

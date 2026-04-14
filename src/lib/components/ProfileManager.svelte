@@ -43,7 +43,7 @@
 
   const providerColors: Record<Provider, string> = {
     aws: 'bg-amber-500',
-    minio: 'bg-red-500',
+    rustfs: 'bg-red-500',
     r2: 'bg-orange-500',
     custom: 'bg-blue-500',
   };
@@ -89,7 +89,7 @@
 
   function handleProviderChange(provider: Provider) {
     form.provider = provider;
-    if (provider === 'minio') {
+    if (provider === 'rustfs') {
       form.path_style = true;
       form.endpoint = 'http://localhost:9000';
       form.region = 'us-east-1';
@@ -146,9 +146,7 @@
       } else {
         testResult = {
           success: false,
-          message:
-            result.message +
-            '\n\n' + m.profile_tip_bucket(),
+          message: result.message + '\n\n' + m.profile_tip_bucket(),
         };
       }
     } catch (e: any) {
@@ -181,7 +179,7 @@
   });
 
   const needsEndpoint = $derived(
-    form.provider === 'minio' || form.provider === 'r2' || form.provider === 'custom',
+    form.provider === 'rustfs' || form.provider === 'r2' || form.provider === 'custom',
   );
 </script>
 
@@ -243,7 +241,11 @@
 
       <Separator />
 
-      <Button variant="outline" class="w-full gap-2 cursor-pointer" onclick={() => (showForm = true)}>
+      <Button
+        variant="outline"
+        class="w-full gap-2 cursor-pointer"
+        onclick={() => (showForm = true)}
+      >
         <Plus class="h-4 w-4" />
         {m.profile_new()}
       </Button>
@@ -257,14 +259,18 @@
         <!-- Name -->
         <div class="space-y-1">
           <label class="text-xs text-muted-foreground" for="profile-name">{m.profile_name()}</label>
-          <Input id="profile-name" bind:value={form.name} placeholder={m.profile_placeholder_name()} />
+          <Input
+            id="profile-name"
+            bind:value={form.name}
+            placeholder={m.profile_placeholder_name()}
+          />
         </div>
 
         <!-- Provider -->
         <div class="space-y-1">
           <span class="text-xs text-muted-foreground">{m.profile_provider()}</span>
           <div class="flex gap-2">
-            {#each ['aws', 'minio', 'r2', 'custom'] as provider}
+            {#each ['aws', 'rustfs', 'r2', 'custom'] as provider}
               <button
                 class="flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs transition-colors
                   {form.provider === provider
@@ -282,7 +288,9 @@
         <!-- Endpoint (conditional) -->
         {#if needsEndpoint}
           <div class="space-y-1">
-            <label class="text-xs text-muted-foreground" for="profile-endpoint">{m.profile_endpoint()}</label>
+            <label class="text-xs text-muted-foreground" for="profile-endpoint"
+              >{m.profile_endpoint()}</label
+            >
             <Input
               id="profile-endpoint"
               bind:value={form.endpoint as string}
@@ -293,13 +301,16 @@
 
         <!-- Region -->
         <div class="space-y-1">
-          <label class="text-xs text-muted-foreground" for="profile-region">{m.profile_region()}</label>
+          <label class="text-xs text-muted-foreground" for="profile-region"
+            >{m.profile_region()}</label
+          >
           <Input id="profile-region" bind:value={form.region} placeholder="us-east-1" />
         </div>
 
         <!-- Access Key -->
         <div class="space-y-1">
-          <label class="text-xs text-muted-foreground" for="profile-access-key">{m.profile_access_key()}</label
+          <label class="text-xs text-muted-foreground" for="profile-access-key"
+            >{m.profile_access_key()}</label
           >
           <Input
             id="profile-access-key"
@@ -310,7 +321,8 @@
 
         <!-- Secret Key -->
         <div class="space-y-1">
-          <label class="text-xs text-muted-foreground" for="profile-secret">{m.profile_secret_key()}</label
+          <label class="text-xs text-muted-foreground" for="profile-secret"
+            >{m.profile_secret_key()}</label
           >
           <Input
             id="profile-secret"
@@ -341,7 +353,8 @@
         <!-- Default Bucket (optional) -->
         <div class="space-y-1">
           <label class="text-xs text-muted-foreground" for="profile-default-bucket">
-            {m.profile_default_bucket()} <span class="text-zinc-500">({m.profile_default_bucket_hint()})</span>
+            {m.profile_default_bucket()}
+            <span class="text-zinc-500">({m.profile_default_bucket_hint()})</span>
           </label>
           <Input
             id="profile-default-bucket"
@@ -373,7 +386,9 @@
 
         <!-- Actions -->
         <div class="flex gap-2 justify-end">
-          <Button variant="ghost" class="cursor-pointer" onclick={resetForm} disabled={saving}>{m.profile_cancel()}</Button>
+          <Button variant="ghost" class="cursor-pointer" onclick={resetForm} disabled={saving}
+            >{m.profile_cancel()}</Button
+          >
           <Button class="cursor-pointer" onclick={handleSave} disabled={saving || !form.name}>
             {#if saving}
               <LoaderCircle class="h-4 w-4 animate-spin mr-2" />
@@ -393,6 +408,8 @@
     <DialogHeader>
       <DialogTitle>{m.profile_path_style_info_title()}</DialogTitle>
     </DialogHeader>
-    <p class="text-sm text-muted-foreground whitespace-pre-line">{m.profile_path_style_info_body()}</p>
+    <p class="text-sm text-muted-foreground whitespace-pre-line">
+      {m.profile_path_style_info_body()}
+    </p>
   </DialogContent>
 </Dialog>

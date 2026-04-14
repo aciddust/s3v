@@ -29,12 +29,12 @@ class LogStore {
   }
 
   copyLine(entry: LogEntry) {
-    navigator.clipboard.writeText(this.formatEntry(entry));
+    void navigator.clipboard.writeText(this.formatEntry(entry));
   }
 
   copyAll() {
     const text = this.entries.map((e) => this.formatEntry(e)).join('\n');
-    navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text);
   }
 
   downloadLog(bucketName?: string) {

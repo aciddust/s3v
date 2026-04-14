@@ -1,10 +1,5 @@
 <script lang="ts">
-  import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-  } from '$lib/components/ui/dialog';
+  import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { invoke } from '@tauri-apps/api/core';
@@ -67,7 +62,12 @@
 
       <div class="space-y-1">
         <label for="fb-email" class="text-xs text-muted-foreground">{m.feedback_email()}</label>
-        <Input id="fb-email" bind:value={email} placeholder={m.feedback_placeholder_optional()} type="email" />
+        <Input
+          id="fb-email"
+          bind:value={email}
+          placeholder={m.feedback_placeholder_optional()}
+          type="email"
+        />
       </div>
 
       <div class="space-y-1">
@@ -88,7 +88,9 @@
       <div class="flex justify-between items-center pt-1">
         <span class="text-[10px] text-muted-foreground">{m.feedback_shortcut()}</span>
         <div class="flex gap-2">
-          <Button variant="ghost" size="sm" onclick={() => (open = false)}>{m.feedback_cancel()}</Button>
+          <Button variant="ghost" size="sm" onclick={() => (open = false)}
+            >{m.feedback_cancel()}</Button
+          >
           <Button size="sm" onclick={handleSubmit} disabled={!content.trim() || sending}>
             {sending ? m.feedback_sending() : m.feedback_send()}
           </Button>

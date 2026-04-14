@@ -147,24 +147,52 @@ export function classifyPaths(paths: string[]): Promise<ClassifiedPaths> {
   return invoke('classify_paths', { paths });
 }
 
-export function checkConflicts(profileId: string, bucket: string, keys: string[]): Promise<string[]> {
+export function checkConflicts(
+  profileId: string,
+  bucket: string,
+  keys: string[],
+): Promise<string[]> {
   return invoke('check_conflicts', { profileId, bucket, keys });
 }
 
 export function copyFolder(
-  profileId: string, sourceBucket: string, sourcePrefix: string,
-  destBucket: string, destPrefix: string,
-  skipKeys: string[] = [], renameKeys: string[] = []
+  profileId: string,
+  sourceBucket: string,
+  sourcePrefix: string,
+  destBucket: string,
+  destPrefix: string,
+  skipKeys: string[] = [],
+  renameKeys: string[] = [],
 ): Promise<string> {
-  return invoke('copy_folder', { profileId, sourceBucket, sourcePrefix, destBucket, destPrefix, skipKeys, renameKeys });
+  return invoke('copy_folder', {
+    profileId,
+    sourceBucket,
+    sourcePrefix,
+    destBucket,
+    destPrefix,
+    skipKeys,
+    renameKeys,
+  });
 }
 
 export function moveFolder(
-  profileId: string, sourceBucket: string, sourcePrefix: string,
-  destBucket: string, destPrefix: string,
-  skipKeys: string[] = [], renameKeys: string[] = []
+  profileId: string,
+  sourceBucket: string,
+  sourcePrefix: string,
+  destBucket: string,
+  destPrefix: string,
+  skipKeys: string[] = [],
+  renameKeys: string[] = [],
 ): Promise<string> {
-  return invoke('move_folder', { profileId, sourceBucket, sourcePrefix, destBucket, destPrefix, skipKeys, renameKeys });
+  return invoke('move_folder', {
+    profileId,
+    sourceBucket,
+    sourcePrefix,
+    destBucket,
+    destPrefix,
+    skipKeys,
+    renameKeys,
+  });
 }
 
 export function cancelFolderOp(opId: string): Promise<void> {
@@ -172,19 +200,37 @@ export function cancelFolderOp(opId: string): Promise<void> {
 }
 
 export function crossProfileCopyObject(
-  sourceProfileId: string, sourceBucket: string, sourceKey: string,
-  destProfileId: string, destBucket: string, destKey: string,
+  sourceProfileId: string,
+  sourceBucket: string,
+  sourceKey: string,
+  destProfileId: string,
+  destBucket: string,
+  destKey: string,
 ): Promise<void> {
   return invoke('cross_profile_copy_object', {
-    sourceProfileId, sourceBucket, sourceKey, destProfileId, destBucket, destKey,
+    sourceProfileId,
+    sourceBucket,
+    sourceKey,
+    destProfileId,
+    destBucket,
+    destKey,
   });
 }
 
 export function crossProfileCopyFolder(
-  sourceProfileId: string, sourceBucket: string, sourcePrefix: string,
-  destProfileId: string, destBucket: string, destPrefix: string,
+  sourceProfileId: string,
+  sourceBucket: string,
+  sourcePrefix: string,
+  destProfileId: string,
+  destBucket: string,
+  destPrefix: string,
 ): Promise<string> {
   return invoke('cross_profile_copy_folder', {
-    sourceProfileId, sourceBucket, sourcePrefix, destProfileId, destBucket, destPrefix,
+    sourceProfileId,
+    sourceBucket,
+    sourcePrefix,
+    destProfileId,
+    destBucket,
+    destPrefix,
   });
 }

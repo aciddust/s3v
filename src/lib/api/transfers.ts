@@ -79,14 +79,28 @@ export function listTransfers(): Promise<TransferJobSummary[]> {
 }
 
 export function enqueueFolderUpload(
-  profileId: string, localDir: string, bucket: string, remotePrefix: string,
-  skipKeys: string[] = [], renameKeys: string[] = []
+  profileId: string,
+  localDir: string,
+  bucket: string,
+  remotePrefix: string,
+  skipKeys: string[] = [],
+  renameKeys: string[] = [],
 ): Promise<string[]> {
-  return invoke('enqueue_folder_upload', { profileId, localDir, bucket, remotePrefix, skipKeys, renameKeys });
+  return invoke('enqueue_folder_upload', {
+    profileId,
+    localDir,
+    bucket,
+    remotePrefix,
+    skipKeys,
+    renameKeys,
+  });
 }
 
 export function enqueueFolderDownload(
-  profileId: string, bucket: string, remotePrefix: string, localDir: string
+  profileId: string,
+  bucket: string,
+  remotePrefix: string,
+  localDir: string,
 ): Promise<string[]> {
   return invoke('enqueue_folder_download', { profileId, bucket, remotePrefix, localDir });
 }
@@ -98,9 +112,9 @@ export function onTransferProgress(
 }
 
 export function onTransferStatusChanged(
-  handler: (event: TransferStatusEvent) => void,
+  handler: (event: TransferStatusEvent) => void | Promise<void>,
 ): Promise<UnlistenFn> {
-  return listen<TransferStatusEvent>('transfer:status', (e) => handler(e.payload));
+  return listen<TransferStatusEvent>('transfer:status', (e) => void handler(e.payload));
 }
 
 export function onTransferCompleted(
@@ -109,8 +123,6 @@ export function onTransferCompleted(
   return listen<TransferCompletedEvent>('transfer:completed', (e) => handler(e.payload));
 }
 
-export function onTransferAdded(
-  handler: (event: TransferJobSummary) => void,
-): Promise<UnlistenFn> {
+export function onTransferAdded(handler: (event: TransferJobSummary) => void): Promise<UnlistenFn> {
   return listen<TransferJobSummary>('transfer:added', (e) => handler(e.payload));
 }

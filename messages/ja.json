@@ -66,7 +66,7 @@
   "profile_secret_key": "シークレットアクセスキー",
   "profile_path_style": "Path-style URLを強制使用",
   "profile_path_style_info_title": "Path-style URLとは？",
-  "profile_path_style_info_body": "S3は2つのURL形式をサポートしています：\n\n• Virtual-hosted style（デフォルト）：\n  https://my-bucket.s3.amazonaws.com/key\n\n• Path style：\n  https://s3.amazonaws.com/my-bucket/key\n\n以下のようなS3互換サービスでこのオプションを有効にしてください：\n• MinIO、LocalStack（セルフホスト）\n• カスタムエンドポイントを使用するS3互換サービス\n\nAWS S3やCloudflare R2では不要です。",
+  "profile_path_style_info_body": "S3は2つのURL形式をサポートしています：\n\n• Virtual-hosted style（デフォルト）：\n  https://my-bucket.s3.amazonaws.com/key\n\n• Path style：\n  https://s3.amazonaws.com/my-bucket/key\n\n以下のようなS3互換サービスでこのオプションを有効にしてください：\n• RustFS、LocalStack（セルフホスト）\n• カスタムエンドポイントを使用するS3互換サービス\n\nAWS S3やCloudflare R2では不要です。",
   "profile_default_bucket": "デフォルトバケット",
   "profile_default_bucket_hint": "任意 — バケット限定トークン用",
   "profile_placeholder_name": "マイS3プロファイル",

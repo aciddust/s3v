@@ -27,6 +27,7 @@
         <button
           role="switch"
           aria-checked={settingsStore.autoShowTransfers}
+          aria-label={m.settings_auto_show_transfers()}
           class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors
             {settingsStore.autoShowTransfers ? 'bg-primary' : 'bg-muted-foreground/30'}"
           onclick={() => settingsStore.setAutoShowTransfers(!settingsStore.autoShowTransfers)}
@@ -42,17 +43,22 @@
       <div class="border-t border-border pt-3">
         <div class="flex items-center gap-1.5 mb-3">
           <FlaskConical class="h-3.5 w-3.5 text-muted-foreground" />
-          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{m.settings_experimental()}</span>
+          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+            >{m.settings_experimental()}</span
+          >
         </div>
 
         <label class="flex items-center justify-between gap-3">
           <div class="space-y-0.5">
             <div class="text-sm font-medium">{m.settings_folder_drag_download()}</div>
-            <div class="text-xs text-muted-foreground">{m.settings_folder_drag_download_desc()}</div>
+            <div class="text-xs text-muted-foreground">
+              {m.settings_folder_drag_download_desc()}
+            </div>
           </div>
           <button
             role="switch"
             aria-checked={settingsStore.folderDragDownload}
+            aria-label={m.settings_folder_drag_download()}
             class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors
               {settingsStore.folderDragDownload ? 'bg-primary' : 'bg-muted-foreground/30'}"
             onclick={() => settingsStore.setFolderDragDownload(!settingsStore.folderDragDownload)}

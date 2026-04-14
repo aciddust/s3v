@@ -2,7 +2,7 @@
   import { store } from './store.svelte';
   import { Plug, Trash2, Plus, Pencil, Check, X } from '@lucide/svelte';
 
-  type Provider = 'aws' | 'minio' | 'r2' | 'custom';
+  type Provider = 'aws' | 'rustfs' | 'r2' | 'custom';
 
   interface MockProfile {
     id: string;
@@ -18,7 +18,7 @@
 
   const providerColors: Record<Provider, string> = {
     aws: 'bg-amber-500',
-    minio: 'bg-red-500',
+    rustfs: 'bg-red-500',
     r2: 'bg-orange-500',
     custom: 'bg-blue-500',
   };
@@ -27,7 +27,7 @@
   let savedProfiles = $state<MockProfile[]>([
     { id: 'demo', name: 'Production (AWS)', provider: 'aws', endpoint: null, region: 'ap-northeast-2', access_key_id: 'AKIAIOSFODNN7EXAMPLE', secret_access_key: '••••••••••••••••', path_style: false, default_bucket: null },
     { id: 'r2-assets', name: 'CDN Assets (R2)', provider: 'r2', endpoint: 'https://abc123.r2.cloudflarestorage.com', region: 'auto', access_key_id: 'R2EXAMPLEKEY1234', secret_access_key: '••••••••••••••••', path_style: false, default_bucket: 'assets' },
-    { id: 'minio-local', name: 'Local Dev (MinIO)', provider: 'minio', endpoint: 'http://localhost:9000', region: 'us-east-1', access_key_id: 'minioadmin', secret_access_key: '••••••••••••••••', path_style: true, default_bucket: null },
+    { id: 'rustfs-local', name: 'Local Dev (RustFS)', provider: 'rustfs', endpoint: 'http://localhost:9000', region: 'us-east-1', access_key_id: 'rustfsadmin', secret_access_key: '••••••••••••••••', path_style: true, default_bucket: null },
   ]);
 
   let showForm = $state(false);
@@ -52,16 +52,16 @@
   });
 
   const needsEndpoint = $derived(
-    form.provider === 'minio' || form.provider === 'r2' || form.provider === 'custom',
+    form.provider === 'rustfs' || form.provider === 'r2' || form.provider === 'custom',
   );
 
   function handleProviderChange(provider: Provider) {
     form.provider = provider;
-    if (provider === 'minio') {
+    if (provider === 'rustfs') {
       form.path_style = true;
       form.endpoint = 'http://localhost:9000';
       form.region = 'us-east-1';
-      form.access_key_id = 'minioadmin';
+      form.access_key_id = 'rustfsadmin';
       form.secret_access_key = '••••••••••••••••';
     } else if (provider === 'aws') {
       form.path_style = false;
@@ -84,7 +84,7 @@
     }
   }
 
-  const bucketCounts: Record<string, number> = { aws: 3, r2: 1, minio: 5, custom: 2 };
+  const bucketCounts: Record<string, number> = { aws: 3, r2: 1, rustfs: 5, custom: 2 };
 
   function handleConnect(profile: MockProfile) {
     store.connectProfile({ id: profile.id, name: profile.name, provider: profile.provider });
@@ -224,7 +224,7 @@
             <div class="space-y-1">
               <span class="text-xs text-muted-foreground">Provider</span>
               <div class="flex gap-2">
-                {#each ['aws', 'minio', 'r2', 'custom'] as provider}
+                {#each ['aws', 'rustfs', 'r2', 'custom'] as provider}
                   <button
                     class="flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs transition-colors
                       {form.provider === provider ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}"

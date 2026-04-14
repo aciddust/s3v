@@ -50,10 +50,10 @@ class DragStore {
     this.y = e.clientY;
     this.hoverDropKey = null;
 
-    const updateModifier = (e: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }) => {
-      if (this.isMac ? e.metaKey : e.ctrlKey) {
+    const updateModifier = (ev: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }) => {
+      if (this.isMac ? ev.metaKey : ev.ctrlKey) {
         this.modifierKey = 'meta';
-      } else if (e.shiftKey) {
+      } else if (ev.shiftKey) {
         this.modifierKey = 'shift';
       } else {
         this.modifierKey = null;
@@ -96,43 +96,49 @@ class DragStore {
           const plainKeys = [...keys];
 
           // Block folder native drag if disabled in settings
-          const hasFolders = plainKeys.some(k => k.endsWith('/'));
+          const hasFolders = plainKeys.some((k) => k.endsWith('/'));
           if (hasFolders && !settingsStore.folderDragDownload) {
             return;
           }
 
           this.nativeDragStarted = true;
           // Listen for debug event from backend
-          import('@tauri-apps/api/event').then(({ listen }) => {
-            listen('native-drag-debug', (e) => {
-              console.log('[drag] backend debug:', e.payload);
+          void import('@tauri-apps/api/event').then(({ listen }) => {
+            void listen('native-drag-debug', (ev) => {
+              console.log('[drag] backend debug:', ev.payload);
             });
           });
-          console.log('[drag] near edge, invoking start_native_drag', { profileId, bucket, keys: plainKeys });
-          import('@tauri-apps/api/core').then(({ invoke }) => {
-            invoke('start_native_drag', { profileId, bucket, keys: plainKeys }).then(() => {
-              console.log('[drag] start_native_drag succeeded');
-              // Success: clean up custom drag (native drag takes over mouse events)
-              window.removeEventListener('mousemove', onMove);
-              window.removeEventListener('mouseup', onUp as EventListener);
-              window.removeEventListener('keydown', onKey);
-              window.removeEventListener('keyup', onKey);
-              setTimeout(() => {
-                this.active = false;
-                this.payload = null;
-                this.hoverDropKey = null;
-                this.modifierKey = null;
-                this.nearEdge = false;
+          console.log('[drag] near edge, invoking start_native_drag', {
+            profileId,
+            bucket,
+            keys: plainKeys,
+          });
+          void import('@tauri-apps/api/core').then(({ invoke }) => {
+            invoke('start_native_drag', { profileId, bucket, keys: plainKeys })
+              .then(() => {
+                console.log('[drag] start_native_drag succeeded');
+                // Success: clean up custom drag (native drag takes over mouse events)
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp as EventListener);
+                window.removeEventListener('keydown', onKey);
+                window.removeEventListener('keyup', onKey);
+                setTimeout(() => {
+                  this.active = false;
+                  this.payload = null;
+                  this.hoverDropKey = null;
+                  this.modifierKey = null;
+                  this.nearEdge = false;
+                  this.nativeDragStarted = false;
+                  this.hoverTabProfileId = null;
+                  this.hoverTabDroppable = false;
+                }, 100);
+              })
+              .catch((err: unknown) => {
+                console.error('Native drag failed:', err);
+                console.error('Native drag error type:', typeof err, JSON.stringify(err));
                 this.nativeDragStarted = false;
-                this.hoverTabProfileId = null;
-                this.hoverTabDroppable = false;
-              }, 100);
-            }).catch((err: unknown) => {
-              console.error('Native drag failed:', err);
-              console.error('Native drag error type:', typeof err, JSON.stringify(err));
-              this.nativeDragStarted = false;
-              this.nearEdge = false;
-            });
+                this.nearEdge = false;
+              });
           });
           return;
         }
@@ -148,7 +154,9 @@ class DragStore {
       const modifier = this.modifierKey;
       const dropTarget = document.elementFromPoint(this.x, this.y);
       if (dropTarget) {
-        dropTarget.dispatchEvent(new CustomEvent('internaldrop', { bubbles: true, detail: { modifier } }));
+        dropTarget.dispatchEvent(
+          new CustomEvent('internaldrop', { bubbles: true, detail: { modifier } }),
+        );
       }
       setTimeout(() => {
         this.active = false;
@@ -196,8 +204,11 @@ class DragStore {
         const mainArea = document.querySelector('[data-main-area]') as HTMLElement | null;
         if (mainArea) {
           const rect = mainArea.getBoundingClientRect();
-          const isInside = me.clientX >= rect.left && me.clientX <= rect.right &&
-                           me.clientY >= rect.top && me.clientY <= rect.bottom;
+          const isInside =
+            me.clientX >= rect.left &&
+            me.clientX <= rect.right &&
+            me.clientY >= rect.top &&
+            me.clientY <= rect.bottom;
           if (isInside) {
             this.hoverPanelSide = me.clientX < rect.left + rect.width / 2 ? 'left' : 'right';
           } else {

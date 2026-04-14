@@ -26,7 +26,7 @@ export function formatDate(dateStr: string): string {
 export function getFileExtension(key: string): string {
   const name = getFileName(key);
   const dotIndex = name.lastIndexOf('.');
-  if (dotIndex < 0 || dotIndex === 0) return '';
+  if (dotIndex <= 0) return '';
   return name.slice(dotIndex + 1).toLowerCase();
 }
 

@@ -17,12 +17,35 @@
   let { open = $bindable(), action, files, onconfirm, oncancel }: Props = $props();
 
   const actionLabels = $derived<
-    Record<ConfirmAction, { title: string; confirm: string; variant: 'default' | 'destructive'; warning: string }>
+    Record<
+      ConfirmAction,
+      { title: string; confirm: string; variant: 'default' | 'destructive'; warning: string }
+    >
   >({
-    delete: { title: m.confirm_delete(), confirm: m.confirm_delete(), variant: 'destructive', warning: m.confirm_delete_warning() },
-    move: { title: m.confirm_move(), confirm: m.confirm_move(), variant: 'default', warning: m.confirm_move_warning() },
-    copy: { title: m.confirm_copy(), confirm: m.confirm_copy(), variant: 'default', warning: m.confirm_copy_warning() },
-    upload: { title: m.confirm_upload(), confirm: m.confirm_upload(), variant: 'default', warning: m.confirm_upload_warning() },
+    delete: {
+      title: m.confirm_delete(),
+      confirm: m.confirm_delete(),
+      variant: 'destructive',
+      warning: m.confirm_delete_warning(),
+    },
+    move: {
+      title: m.confirm_move(),
+      confirm: m.confirm_move(),
+      variant: 'default',
+      warning: m.confirm_move_warning(),
+    },
+    copy: {
+      title: m.confirm_copy(),
+      confirm: m.confirm_copy(),
+      variant: 'default',
+      warning: m.confirm_copy_warning(),
+    },
+    upload: {
+      title: m.confirm_upload(),
+      confirm: m.confirm_upload(),
+      variant: 'default',
+      warning: m.confirm_upload_warning(),
+    },
   });
 
   const label = $derived(actionLabels[action]);
@@ -60,10 +83,16 @@
     </ul>
 
     {#if remainCount > 0}
-      <p class="text-xs text-muted-foreground px-2">{m.confirm_remaining({ count: remainCount })}</p>
+      <p class="text-xs text-muted-foreground px-2">
+        {m.confirm_remaining({ count: remainCount })}
+      </p>
     {/if}
 
-    <div class="flex items-center gap-1.5 px-2 pt-2 text-xs {action === 'delete' || action === 'move' ? 'text-destructive' : 'text-muted-foreground'}">
+    <div
+      class="flex items-center gap-1.5 px-2 pt-2 text-xs {action === 'delete' || action === 'move'
+        ? 'text-destructive'
+        : 'text-muted-foreground'}"
+    >
       <TriangleAlert class="h-3.5 w-3.5 shrink-0" />
       <span>{label.warning}</span>
     </div>

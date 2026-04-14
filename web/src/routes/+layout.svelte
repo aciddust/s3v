@@ -18,7 +18,7 @@
   <title>{title}</title>
   <meta name="description" content={description} />
   <meta name="author" content="d3fau1t" />
-  <meta name="keywords" content="S3, S3V, storage client, bucket manager, AWS S3, MinIO, Cloudflare R2, drag and drop, dual panel, file manager" />
+  <meta name="keywords" content="S3, S3V, storage client, bucket manager, AWS S3, RustFS, Cloudflare R2, drag and drop, dual panel, file manager" />
   <link rel="canonical" href={url} />
 
   <!-- Open Graph -->

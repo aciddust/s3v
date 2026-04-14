@@ -55,7 +55,14 @@
     crossProfileCopyObject,
     crossProfileCopyFolder,
   } from '$lib/api/s3';
-  import { enqueueUpload, enqueueDownload, enqueueFolderUpload, enqueueFolderDownload, onTransferCompleted, onTransferAdded } from '$lib/api/transfers';
+  import {
+    enqueueUpload,
+    enqueueDownload,
+    enqueueFolderUpload,
+    enqueueFolderDownload,
+    onTransferCompleted,
+    onTransferAdded,
+  } from '$lib/api/transfers';
   import { listProfiles, type ProfileSummary } from '$lib/api/profiles';
 
   // Utils
@@ -76,9 +83,7 @@
       : null,
   );
   /** The profileId to use for S3 API calls on the currently active panel */
-  const activeOpProfileId = $derived(
-    activeStoreId ? activeStoreId.replace(/::right$/, '') : null,
-  );
+  const activeOpProfileId = $derived(activeStoreId ? activeStoreId.replace(/::right$/, '') : null);
   const leftFileState = $derived(activeProfileId ? fileStore.getState(activeProfileId) : null);
   const fileState = $derived(activeStoreId ? fileStore.getState(activeStoreId) : null);
   const isConnected = $derived(activeTab?.connected ?? false);
@@ -407,7 +412,14 @@
         conflictKeys = conflicts;
         conflictCallback = async (result: ConflictResult) => {
           try {
-            await enqueueFolderUpload(pid, String(localDir), bucket, remotePrefix, result.skip, result.rename);
+            await enqueueFolderUpload(
+              pid,
+              String(localDir),
+              bucket,
+              remotePrefix,
+              result.skip,
+              result.rename,
+            );
             if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
             await transferStore.reload();
           } catch (e) {
@@ -528,19 +540,44 @@
       }
     }
     const items: ContextMenuItem[] = [
-      { label: m.page_context_download(), action: handleDownload, disabled: keys.length === 0, separator: false },
+      {
+        label: m.page_context_download(),
+        action: handleDownload,
+        disabled: keys.length === 0,
+        separator: false,
+      },
       {
         label: m.page_context_copy_key(),
         action: () => handleCopyKey(keys),
         disabled: keys.length === 0,
         separator: false,
       },
-      { label: m.page_context_share_url(), action: handleShare, disabled: keys.length !== 1, separator: false },
+      {
+        label: m.page_context_share_url(),
+        action: handleShare,
+        disabled: keys.length !== 1,
+        separator: false,
+      },
       { label: '', action: () => {}, separator: true },
-      { label: m.page_context_rename(), action: handleRename, disabled: keys.length !== 1, separator: false },
-      { label: m.page_context_delete(), action: handleDelete, disabled: keys.length === 0, separator: false },
+      {
+        label: m.page_context_rename(),
+        action: handleRename,
+        disabled: keys.length !== 1,
+        separator: false,
+      },
+      {
+        label: m.page_context_delete(),
+        action: handleDelete,
+        disabled: keys.length === 0,
+        separator: false,
+      },
       { label: '', action: () => {}, separator: true },
-      { label: m.page_context_copy_to(), action: () => handleCopy(), disabled: keys.length === 0, separator: false },
+      {
+        label: m.page_context_copy_to(),
+        action: () => handleCopy(),
+        disabled: keys.length === 0,
+        separator: false,
+      },
     ];
     uiStore.openContextMenu(e.clientX, e.clientY, items);
   }
@@ -548,8 +585,18 @@
   function handleBgContextMenu(e: MouseEvent) {
     e.preventDefault();
     const items: ContextMenuItem[] = [
-      { label: m.page_context_upload(), action: handleUpload, disabled: !isConnected, separator: false },
-      { label: m.page_context_new_folder(), action: handleNewFolder, disabled: !isConnected, separator: false },
+      {
+        label: m.page_context_upload(),
+        action: handleUpload,
+        disabled: !isConnected,
+        separator: false,
+      },
+      {
+        label: m.page_context_new_folder(),
+        action: handleNewFolder,
+        disabled: !isConnected,
+        separator: false,
+      },
       { label: '', action: () => {}, separator: true },
       {
         label: m.page_context_refresh(),
@@ -660,11 +707,21 @@
             const folderName = key.slice(0, -1).split('/').pop() || '';
             if (isCrossProfile) {
               await crossProfileCopyFolder(
-                sourceProfileId, sourceBucket, key,
-                destProfileId, destBucket, destPrefix + folderName + '/',
+                sourceProfileId,
+                sourceBucket,
+                key,
+                destProfileId,
+                destBucket,
+                destPrefix + folderName + '/',
               );
             } else {
-              await copyFolder(destProfileId, sourceBucket, key, destBucket, destPrefix + folderName + '/');
+              await copyFolder(
+                destProfileId,
+                sourceBucket,
+                key,
+                destBucket,
+                destPrefix + folderName + '/',
+              );
             }
           } else {
             const filename = key.split('/').pop() || key;
@@ -672,11 +729,21 @@
             try {
               if (isCrossProfile) {
                 await crossProfileCopyObject(
-                  sourceProfileId, sourceBucket, key,
-                  destProfileId, destBucket, destPrefix + filename,
+                  sourceProfileId,
+                  sourceBucket,
+                  key,
+                  destProfileId,
+                  destBucket,
+                  destPrefix + filename,
                 );
               } else {
-                await copyObject(destProfileId, sourceBucket, key, destBucket, destPrefix + filename);
+                await copyObject(
+                  destProfileId,
+                  sourceBucket,
+                  key,
+                  destBucket,
+                  destPrefix + filename,
+                );
               }
               moveStore.completeJob(jobId, 'completed');
             } catch (e) {
@@ -730,7 +797,12 @@
     if (!targetState.bucket) return;
 
     // Same bucket + same prefix → nothing to do
-    if (sourceProfileId === targetProfileId && data.bucket === targetState.bucket && data.sourcePrefix === targetState.prefix) return;
+    if (
+      sourceProfileId === targetProfileId &&
+      data.bucket === targetState.bucket &&
+      data.sourcePrefix === targetState.prefix
+    )
+      return;
 
     const keys = data.keys;
     const sourceBucket = data.bucket;
@@ -748,11 +820,21 @@
             const folderName = key.slice(0, -1).split('/').pop() || '';
             if (isCrossProfile) {
               await crossProfileCopyFolder(
-                sourceProfileId, sourceBucket, key,
-                targetProfileId, destBucket, destPrefix + folderName + '/',
+                sourceProfileId,
+                sourceBucket,
+                key,
+                targetProfileId,
+                destBucket,
+                destPrefix + folderName + '/',
               );
             } else {
-              await copyFolder(sourceProfileId, sourceBucket, key, destBucket, destPrefix + folderName + '/');
+              await copyFolder(
+                sourceProfileId,
+                sourceBucket,
+                key,
+                destBucket,
+                destPrefix + folderName + '/',
+              );
             }
           } else {
             const filename = key.split('/').pop() || key;
@@ -760,11 +842,21 @@
             try {
               if (isCrossProfile) {
                 await crossProfileCopyObject(
-                  sourceProfileId, sourceBucket, key,
-                  targetProfileId, destBucket, destPrefix + filename,
+                  sourceProfileId,
+                  sourceBucket,
+                  key,
+                  targetProfileId,
+                  destBucket,
+                  destPrefix + filename,
                 );
               } else {
-                await copyObject(sourceProfileId, sourceBucket, key, destBucket, destPrefix + filename);
+                await copyObject(
+                  sourceProfileId,
+                  sourceBucket,
+                  key,
+                  destBucket,
+                  destPrefix + filename,
+                );
               }
               moveStore.completeJob(jobId, 'completed');
             } catch (e) {
@@ -793,9 +885,16 @@
         uiStore.dualPanel = true;
       }
       if (droppedTab?.buckets.length) {
-        const ok = await fileStore.navigate(`${droppedProfileId}::right`, droppedTab.buckets[0].name, '');
+        const ok = await fileStore.navigate(
+          `${droppedProfileId}::right`,
+          droppedTab.buckets[0].name,
+          '',
+        );
         if (!ok) {
-          toast.error(m.page_connection_failed?.() ?? `Failed to connect to "${droppedTab.profile.name}". Please check the connection settings.`);
+          toast.error(
+            m.page_connection_failed?.() ??
+              `Failed to connect to "${droppedTab.profile.name}". Please check the connection settings.`,
+          );
           uiStore.setRightPanelProfile(null);
           if (!isDual) uiStore.dualPanel = false;
         }
@@ -818,7 +917,11 @@
         const currentRightState = fileStore.getState(`${prevProfileId}::right`);
         uiStore.setRightPanelProfile(prevProfileId);
         if (currentRightState.bucket) {
-          fileStore.navigate(`${prevProfileId}::right`, currentRightState.bucket, currentRightState.prefix);
+          fileStore.navigate(
+            `${prevProfileId}::right`,
+            currentRightState.bucket,
+            currentRightState.prefix,
+          );
         }
       }
       profileStore.setActiveTab(droppedProfileId);
@@ -922,7 +1025,7 @@
         activePrefix={leftFileState.prefix}
         rightProfileId={uiStore.rightPanelProfileId ?? undefined}
         rightProfileName={uiStore.rightPanelProfileId
-          ? profileStore.tabs.find(t => t.profileId === uiStore.rightPanelProfileId)?.profile.name
+          ? profileStore.tabs.find((t) => t.profileId === uiStore.rightPanelProfileId)?.profile.name
           : undefined}
         onnavigate={handleNavigate}
         oncontextmenu={handleContextMenu}
@@ -971,9 +1074,7 @@
         {:else}
           <h2 class="text-2xl font-bold text-foreground">S3V</h2>
           <p class="text-sm text-muted-foreground mb-4">
-            {profileStore.tabs.length === 0
-              ? m.page_connect_prompt()
-              : m.page_select_tab()}
+            {profileStore.tabs.length === 0 ? m.page_connect_prompt() : m.page_select_tab()}
           </p>
 
           {#if lastProfile}

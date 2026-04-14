@@ -95,7 +95,8 @@
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         data-panel-side="left"
-        class="relative flex flex-1 flex-col overflow-hidden border-r border-border {activePanel === 'left'
+        class="relative flex flex-1 flex-col overflow-hidden border-r border-border {activePanel ===
+        'left'
           ? 'ring-1 ring-primary/40 ring-inset'
           : ''}"
         onmousedown={activateLeft}
@@ -118,7 +119,9 @@
           {onfileopen}
         />
         {#if tabDragActive && hoverPanelSide === 'left'}
-          <div class="absolute inset-0 bg-primary/10 ring-2 ring-primary ring-inset pointer-events-none z-10"></div>
+          <div
+            class="absolute inset-0 bg-primary/10 ring-2 ring-primary ring-inset pointer-events-none z-10"
+          ></div>
         {/if}
       </div>
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -148,7 +151,9 @@
           {onfileopen}
         />
         {#if tabDragActive && hoverPanelSide === 'right'}
-          <div class="absolute inset-0 bg-primary/10 ring-2 ring-primary ring-inset pointer-events-none z-10"></div>
+          <div
+            class="absolute inset-0 bg-primary/10 ring-2 ring-primary ring-inset pointer-events-none z-10"
+          ></div>
         {/if}
       </div>
     </div>
@@ -176,9 +181,17 @@
       />
       {#if tabDragActive && hoverPanelSide}
         <div class="absolute inset-0 flex pointer-events-none z-10">
-          <div class="flex-1 {hoverPanelSide === 'left' ? 'bg-primary/10 ring-2 ring-primary ring-inset' : ''}"></div>
+          <div
+            class="flex-1 {hoverPanelSide === 'left'
+              ? 'bg-primary/10 ring-2 ring-primary ring-inset'
+              : ''}"
+          ></div>
           <div class="w-px bg-border"></div>
-          <div class="flex-1 {hoverPanelSide === 'right' ? 'bg-primary/10 ring-2 ring-primary ring-inset' : ''}"></div>
+          <div
+            class="flex-1 {hoverPanelSide === 'right'
+              ? 'bg-primary/10 ring-2 ring-primary ring-inset'
+              : ''}"
+          ></div>
         </div>
       {/if}
     </div>

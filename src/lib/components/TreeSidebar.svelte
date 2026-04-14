@@ -32,7 +32,10 @@
 <div
   class="flex h-full flex-col border-r border-border bg-background"
   style="width: {width}px; min-width: {width}px;"
-  oncontextmenu={(e) => { if (onbgcontextmenu) onbgcontextmenu(e); else e.preventDefault(); }}
+  oncontextmenu={(e) => {
+    if (onbgcontextmenu) onbgcontextmenu(e);
+    else e.preventDefault();
+  }}
 >
   <ScrollArea class="flex-1">
     <BucketTree {profileId} {buckets} {activeBucket} {activePrefix} {onnavigate} {onmovetoprefix} />

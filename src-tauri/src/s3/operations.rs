@@ -164,7 +164,7 @@ pub async fn copy_object(
 }
 
 /// Cross-profile copy: download from source client, upload to dest client.
-/// Works across different S3 endpoints (e.g., AWS → R2, MinIO → S3).
+/// Works across different S3 endpoints (e.g., AWS → R2, RustFS → S3).
 pub async fn cross_profile_copy_object(
     source_client: &S3Client,
     dest_client: &S3Client,
@@ -374,10 +374,7 @@ pub async fn list_all_objects(
     let mut continuation_token: Option<String> = None;
 
     loop {
-        let mut req = client
-            .list_objects_v2()
-            .bucket(bucket)
-            .prefix(prefix);
+        let mut req = client.list_objects_v2().bucket(bucket).prefix(prefix);
 
         if let Some(token) = &continuation_token {
             req = req.continuation_token(token);

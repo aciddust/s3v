@@ -121,11 +121,25 @@
       if (modifier === 'shift') {
         onmovetoprefix?.(data.bucket, destPrefix, data.keys);
       } else {
-        oncopytoprefix?.(sourceProfileId, destProfileId, data.bucket, fs.bucket, destPrefix, data.keys);
+        oncopytoprefix?.(
+          sourceProfileId,
+          destProfileId,
+          data.bucket,
+          fs.bucket,
+          destPrefix,
+          data.keys,
+        );
       }
     } else {
       if (modifier === 'meta') {
-        oncopytoprefix?.(sourceProfileId, destProfileId, data.bucket, fs.bucket, destPrefix, data.keys);
+        oncopytoprefix?.(
+          sourceProfileId,
+          destProfileId,
+          data.bucket,
+          fs.bucket,
+          destPrefix,
+          data.keys,
+        );
       } else {
         onmovetoprefix?.(data.bucket, destPrefix, data.keys);
       }
@@ -151,7 +165,8 @@
     function onInternalDrop(e: Event) {
       if (!dragStore.payload) return;
 
-      const modifier = (e as CustomEvent<{ modifier: 'meta' | 'shift' | null }>).detail?.modifier ?? null;
+      const modifier =
+        (e as CustomEvent<{ modifier: 'meta' | 'shift' | null }>).detail?.modifier ?? null;
 
       const target = e.target as HTMLElement;
       const dropRow = target.closest('[data-drop-key]') as HTMLElement | null;

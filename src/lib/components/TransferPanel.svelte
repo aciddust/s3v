@@ -30,65 +30,67 @@
 </script>
 
 {#if visible}
-<div class="fixed bottom-6 right-4 z-40 w-96 rounded-lg border border-border bg-background shadow-lg">
-  <!-- Header -->
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
-    role="button"
-    tabindex="0"
-    class="flex h-7 w-full items-center gap-2 px-3 hover:bg-accent/30 transition-colors select-none cursor-pointer rounded-t-lg"
-    onclick={() => uiStore.toggleTransferPanelContent()}
+    class="fixed bottom-6 right-4 z-40 w-96 rounded-lg border border-border bg-background shadow-lg"
   >
-    <ArrowUpDown class="h-3.5 w-3.5 text-muted-foreground" />
-    <span class="text-xs font-medium">{m.transfer_panel_title()}</span>
+    <!-- Header -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div
+      role="button"
+      tabindex="0"
+      class="flex h-7 w-full items-center gap-2 px-3 hover:bg-accent/30 transition-colors select-none cursor-pointer rounded-t-lg"
+      onclick={() => uiStore.toggleTransferPanelContent()}
+    >
+      <ArrowUpDown class="h-3.5 w-3.5 text-muted-foreground" />
+      <span class="text-xs font-medium">{m.transfer_panel_title()}</span>
 
-    {#if totalBadge > 0}
-      <Badge variant="secondary" class="h-4 px-1.5 text-[10px]">{totalBadge}</Badge>
-    {/if}
+      {#if totalBadge > 0}
+        <Badge variant="secondary" class="h-4 px-1.5 text-[10px]">{totalBadge}</Badge>
+      {/if}
 
-    <div class="flex-1"></div>
+      <div class="flex-1"></div>
 
-    {#if expanded && hasDone}
-      <button
-        class="p-0.5 rounded hover:bg-accent/50"
-        onclick={(e) => {
-          e.stopPropagation();
-          clearAll();
-        }}
-        title="Clear completed"
-      >
-        <ListX class="h-3.5 w-3.5 text-muted-foreground" />
-      </button>
-    {/if}
+      {#if expanded && hasDone}
+        <button
+          class="p-0.5 rounded hover:bg-accent/50"
+          onclick={(e) => {
+            e.stopPropagation();
+            clearAll();
+          }}
+          title="Clear completed"
+        >
+          <ListX class="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+      {/if}
 
-    {#if expanded}
-      <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-    {:else}
-      <ChevronUp class="h-3.5 w-3.5 text-muted-foreground" />
-    {/if}
-  </div>
+      {#if expanded}
+        <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+      {:else}
+        <ChevronUp class="h-3.5 w-3.5 text-muted-foreground" />
+      {/if}
+    </div>
 
-  <!-- Panel content -->
-  <div
-    class="grid transition-[grid-template-rows] duration-300 ease-in-out"
-    style="grid-template-rows: {expanded ? '1fr' : '0fr'};"
-  >
-    <div class="overflow-hidden">
-      <ScrollArea class="h-48">
-        {#if jobs.length === 0 && moveJobs.length === 0}
-          <div class="flex items-center justify-center py-6 text-xs text-muted-foreground">
-            No transfers
-          </div>
-        {:else}
-          {#each moveJobs as job}
-            <MoveItem {job} />
-          {/each}
-          {#each jobs as job}
-            <TransferItem {job} />
-          {/each}
-        {/if}
-      </ScrollArea>
+    <!-- Panel content -->
+    <div
+      class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+      style="grid-template-rows: {expanded ? '1fr' : '0fr'};"
+    >
+      <div class="overflow-hidden">
+        <ScrollArea class="h-48">
+          {#if jobs.length === 0 && moveJobs.length === 0}
+            <div class="flex items-center justify-center py-6 text-xs text-muted-foreground">
+              No transfers
+            </div>
+          {:else}
+            {#each moveJobs as job}
+              <MoveItem {job} />
+            {/each}
+            {#each jobs as job}
+              <TransferItem {job} />
+            {/each}
+          {/if}
+        </ScrollArea>
+      </div>
     </div>
   </div>
-</div>
 {/if}

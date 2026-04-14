@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '$lib/components/ui/dialog';
+  import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+  } from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import * as m from '$lib/paraglide/messages';
 
@@ -30,14 +36,22 @@
       </label>
     </div>
     <DialogFooter>
-      <Button variant="outline" onclick={() => { oncancel(); open = false; }}>
+      <Button
+        variant="outline"
+        onclick={() => {
+          oncancel();
+          open = false;
+        }}
+      >
         {m.confirm_cancel()}
       </Button>
-      <Button onclick={() => {
-        if (selected === 'files') onfiles();
-        else onfolder();
-        open = false;
-      }}>
+      <Button
+        onclick={() => {
+          if (selected === 'files') onfiles();
+          else onfolder();
+          open = false;
+        }}
+      >
         {m.toolbar_upload()}
       </Button>
     </DialogFooter>

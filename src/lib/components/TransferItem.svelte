@@ -51,7 +51,10 @@
 
 <div
   role="listitem"
-  class="flex items-center gap-2 border-b border-border/50 px-3 py-1.5 {job.status === 'completed' && job.path.local ? 'cursor-pointer' : ''}"
+  class="flex items-center gap-2 border-b border-border/50 px-3 py-1.5 {job.status ===
+    'completed' && job.path.local
+    ? 'cursor-pointer'
+    : ''}"
   ondblclick={handleDblClick}
 >
   <!-- Type icon -->
@@ -79,12 +82,19 @@
       {#if job.error}
         <span class="text-destructive truncate max-w-32" title={job.error}>{job.error}</span>
       {:else}
-        <span class={statusColors[job.status]}>{job.status === 'queued' ? m.transfer_status_queued() :
- job.status === 'active' ? m.transfer_status_active() :
- job.status === 'paused' ? m.transfer_status_paused() :
- job.status === 'completed' ? m.transfer_status_completed() :
- job.status === 'failed' ? m.transfer_status_failed() :
- m.transfer_status_cancelled()}</span>
+        <span class={statusColors[job.status]}
+          >{job.status === 'queued'
+            ? m.transfer_status_queued()
+            : job.status === 'active'
+              ? m.transfer_status_active()
+              : job.status === 'paused'
+                ? m.transfer_status_paused()
+                : job.status === 'completed'
+                  ? m.transfer_status_completed()
+                  : job.status === 'failed'
+                    ? m.transfer_status_failed()
+                    : m.transfer_status_cancelled()}</span
+        >
       {/if}
     </div>
   </div>

@@ -62,7 +62,12 @@ class FileStore {
     this.stateMap = next;
   }
 
-  async navigate(storeKey: string, bucket: string, prefix: string, skipHistory = false): Promise<boolean> {
+  async navigate(
+    storeKey: string,
+    bucket: string,
+    prefix: string,
+    skipHistory = false,
+  ): Promise<boolean> {
     const profileId = this.resolveProfileId(storeKey);
     const current = this.getState(storeKey);
 
@@ -70,7 +75,10 @@ class FileStore {
     const historyPatch: Partial<FileState> = {};
     const sameLocation = current.bucket === bucket && current.prefix === prefix;
     if (!skipHistory && current.bucket && !sameLocation) {
-      historyPatch.historyBack = [...current.historyBack, { bucket: current.bucket, prefix: current.prefix }];
+      historyPatch.historyBack = [
+        ...current.historyBack,
+        { bucket: current.bucket, prefix: current.prefix },
+      ];
       historyPatch.historyForward = [];
     }
 
@@ -269,9 +277,9 @@ class FileStore {
   /** Returns folders first (sorted by name), then files sorted by sortField/sortOrder. */
   getSortedItems(profileId: string): (string | S3Object)[] {
     const state = this.getState(profileId);
-    const sortedFolders = [...state.folders].sort((a, b) => a.localeCompare(b));
+    const sortedFolders = [...state.folders].toSorted((a, b) => a.localeCompare(b));
 
-    const sortedFiles = [...state.objects].sort((a, b) => {
+    const sortedFiles = [...state.objects].toSorted((a, b) => {
       let cmp = 0;
       if (state.sortField === 'name') {
         cmp = a.key.localeCompare(b.key);

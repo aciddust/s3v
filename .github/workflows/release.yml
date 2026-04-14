@@ -36,20 +36,31 @@ jobs:
             label: win-arm64
             bundles: nsis
 
+          # Linux x86_64
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            label: linux-x64
+            bundles: appimage,deb
+
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: npm
+          bun-version: latest
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target != 'universal-apple-darwin' && matrix.target || '' }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
 
       - name: Add Rust targets (macOS universal)
         if: matrix.target == 'universal-apple-darwin'
@@ -63,8 +74,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install AppImage tools (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          wget -qO /usr/local/bin/appimagetool \
+            "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x /usr/local/bin/appimagetool
 
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
@@ -75,6 +93,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'S3V ${{ github.ref_name }}'
+          includeUpdaterJson: false
           releaseBody: |
             See the [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
 
@@ -84,6 +103,31 @@ jobs:
             | macOS (Universal) | `s3v_*_universal.dmg` |
             | Windows x64 | `s3v_*_x64-setup.exe` |
             | Windows ARM64 | `s3v_*_arm64-setup.exe` |
+            | Linux x64 (AppImage) | `s3v_*_amd64.AppImage` |
+            | Linux x64 (deb) | `s3v_*_amd64.deb` |
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.target == 'universal-apple-darwin' && '--target universal-apple-darwin' || format('--target {0}', matrix.target) }} --bundles ${{ matrix.bundles }}
+
+      - name: Fix AppImage broken symlinks (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          for appimage in src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage; do
+            [ -f "$appimage" ] || continue
+            dir=$(dirname "$appimage")
+            base=$(basename "$appimage" .AppImage)
+            cd "$dir"
+            ./"${base}.AppImage" --appimage-extract > /dev/null 2>&1
+            # Replace broken absolute-path symlinks with actual files
+            find squashfs-root -xtype l | while read -r link; do
+              target=$(readlink "$link")
+              case "$target" in /home/runner/*)
+                filename=$(basename "$target")
+                actual=$(find squashfs-root -name "$filename" ! -type l 2>/dev/null | head -1)
+                [ -n "$actual" ] && cp "$actual" "$link" && echo "Fixed: $link"
+              ;; esac
+            done
+            appimagetool squashfs-root "${base}.AppImage" 2>/dev/null || true
+            rm -rf squashfs-root
+            cd - > /dev/null
+          done

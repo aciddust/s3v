@@ -66,7 +66,7 @@
   "profile_secret_key": "Secret Access Key",
   "profile_path_style": "Force path-style URLs",
   "profile_path_style_info_title": "Path-style URLs",
-  "profile_path_style_info_body": "S3 supports two URL formats:\n\n• Virtual-hosted style (default):\n  https://my-bucket.s3.amazonaws.com/key\n\n• Path style:\n  https://s3.amazonaws.com/my-bucket/key\n\nEnable this for S3-compatible services that use path-style URLs:\n• MinIO, LocalStack (self-hosted)\n• Other S3-compatible providers with custom endpoints\n\nAWS S3 and Cloudflare R2 do not need this.",
+  "profile_path_style_info_body": "S3 supports two URL formats:\n\n• Virtual-hosted style (default):\n  https://my-bucket.s3.amazonaws.com/key\n\n• Path style:\n  https://s3.amazonaws.com/my-bucket/key\n\nEnable this for S3-compatible services that use path-style URLs:\n• RustFS, LocalStack (self-hosted)\n• Other S3-compatible providers with custom endpoints\n\nAWS S3 and Cloudflare R2 do not need this.",
   "profile_default_bucket": "Default Bucket",
   "profile_default_bucket_hint": "optional — for bucket-scoped tokens",
   "profile_placeholder_name": "My S3 Profile",

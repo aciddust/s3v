@@ -14,13 +14,9 @@
 
   const allTabs = $derived(profileStore.tabs);
   // Hide tabs that are "docked" in the right panel
-  const hiddenProfileId = $derived(
-    uiStore.dualPanel ? uiStore.rightPanelProfileId : null,
-  );
+  const hiddenProfileId = $derived(uiStore.dualPanel ? uiStore.rightPanelProfileId : null);
   const tabs = $derived(
-    hiddenProfileId
-      ? allTabs.filter((t) => t.profileId !== hiddenProfileId)
-      : allTabs,
+    hiddenProfileId ? allTabs.filter((t) => t.profileId !== hiddenProfileId) : allTabs,
   );
 
   let scrollEl: HTMLDivElement | undefined = $state();
@@ -38,7 +34,8 @@
   }
 
   $effect(() => {
-    // Re-check whenever tabs change
+    // Re-check whenever tabs change — intentional reactive dependency tracking
+    // oxlint-disable-next-line no-unused-expressions
     tabs.length;
     // Use a microtask so DOM has updated
     queueMicrotask(updateScrollState);
@@ -59,7 +56,8 @@
         return;
       }
 
-      const modifier = (e as CustomEvent<{ modifier: 'meta' | 'shift' | null }>).detail?.modifier ?? null;
+      const modifier =
+        (e as CustomEvent<{ modifier: 'meta' | 'shift' | null }>).detail?.modifier ?? null;
       ontabdrop?.(targetProfileId, modifier);
     }
 
@@ -94,7 +92,8 @@
         active={tab.profileId === profileStore.activeProfileId}
         status={tab.status}
         profileId={tab.profileId}
-        droppable={dragStore.active && dragStore.payload?.profileId?.replace(/::right$/, '') !== tab.profileId}
+        droppable={dragStore.active &&
+          dragStore.payload?.profileId?.replace(/::right$/, '') !== tab.profileId}
         dragHover={dragStore.active && dragStore.hoverTabProfileId === tab.profileId}
         onactivate={() => profileStore.setActiveTab(tab.profileId)}
         onclose={() => profileStore.closeTab(tab.profileId)}

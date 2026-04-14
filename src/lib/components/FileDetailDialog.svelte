@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '$lib/components/ui/dialog';
+  import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+  } from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import { headObject, type ObjectMetadata } from '$lib/api/s3';
   import { Link, Download, X } from '@lucide/svelte';
@@ -24,9 +30,15 @@
       loading = true;
       metadata = null;
       headObject(profileId, bucket, fileKey)
-        .then((m) => { metadata = m; })
-        .catch(() => { metadata = null; })
-        .finally(() => { loading = false; });
+        .then((result) => {
+          metadata = result;
+        })
+        .catch(() => {
+          metadata = null;
+        })
+        .finally(() => {
+          loading = false;
+        });
     }
   });
 
@@ -100,7 +112,9 @@
       <Button
         variant="outline"
         size="sm"
-        onclick={() => { oncopyurl(fileKey); }}
+        onclick={() => {
+          oncopyurl(fileKey);
+        }}
         disabled={loading}
       >
         <Link class="h-3.5 w-3.5 mr-1.5" />
@@ -109,13 +123,21 @@
       <Button
         variant="outline"
         size="sm"
-        onclick={() => { ondownload(fileKey); }}
+        onclick={() => {
+          ondownload(fileKey);
+        }}
         disabled={loading}
       >
         <Download class="h-3.5 w-3.5 mr-1.5" />
         {m.file_detail_download()}
       </Button>
-      <Button variant="ghost" size="sm" onclick={() => { open = false; }}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onclick={() => {
+          open = false;
+        }}
+      >
         <X class="h-3.5 w-3.5 mr-1.5" />
         {m.file_detail_close()}
       </Button>

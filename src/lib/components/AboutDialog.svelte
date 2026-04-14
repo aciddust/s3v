@@ -1,10 +1,5 @@
 <script lang="ts">
-  import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-  } from '$lib/components/ui/dialog';
+  import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import FeedbackDialog from './FeedbackDialog.svelte';
   import { APP_NAME, APP_VERSION, SUPPORT_EMAIL } from '$lib/constants';
@@ -35,10 +30,14 @@
       <div class="w-full border-t border-border"></div>
 
       <div class="text-center space-y-0.5">
-        <p class="text-[10px] uppercase tracking-wider text-muted-foreground">{m.about_support()}</p>
+        <p class="text-[10px] uppercase tracking-wider text-muted-foreground">
+          {m.about_support()}
+        </p>
         <button
           class="text-xs text-primary hover:underline"
-          onclick={() => { feedbackOpen = true; }}
+          onclick={() => {
+            feedbackOpen = true;
+          }}
         >
           {SUPPORT_EMAIL}
         </button>

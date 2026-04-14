@@ -2,7 +2,7 @@
 
 S3-compatible storage client built with [Tauri v2](https://tauri.app), [SvelteKit](https://svelte.dev), and [Tailwind CSS](https://tailwindcss.com).
 
-Supports **AWS S3**, **MinIO**, **Cloudflare R2**, and any S3-compatible provider.
+Supports **AWS S3**, **RustFS(MinIO)**, **Cloudflare R2**, and any S3-compatible provider.
 
 [![Release](https://github.com/aciddust/s3v/actions/workflows/release.yml/badge.svg)](https://github.com/aciddust/s3v/actions/workflows/release.yml)
 
@@ -46,50 +46,51 @@ Download the latest release from the [Releases](https://github.com/aciddust/s3v/
 | macOS (Universal) | `s3v_*_universal.dmg` |
 | Windows x64 | `s3v_*_x64-setup.exe` |
 | Windows ARM64 | `s3v_*_arm64-setup.exe` |
+| Linux x64 (AppImage) | `s3v_*_amd64.AppImage` |
+| Linux x64 (deb) | `s3v_*_amd64.deb` |
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org) >= 18
+- [Bun](https://bun.sh) >= 1.3
 - [Rust](https://rustup.rs) >= 1.77
+- [mold](https://github.com/rui314/mold) (Linux, faster linker) or [lld](https://lld.llvm.org) (macOS/Windows)
 - Tauri v2 system dependencies ([setup guide](https://v2.tauri.app/start/prerequisites/))
 
 ## Quick Start
 
 ```bash
 # Install dependencies
-make install
+bun run install:all
 
 # Start development server
-make dev
+bun run dev:tauri
 ```
 
 ## Available Commands
 
-```bash
-make help
-```
-
 | Command | Description |
 | --- | --- |
-| `make dev` | Start Tauri dev (frontend + backend hot-reload) |
-| `make check` | Type-check Svelte + Rust |
-| `make fmt` | Format code (Prettier + cargo fmt) |
-| `make build` | Build frontend only |
-| `make bundle` | Build distributable app (dmg/msi/deb) |
-| `make bundle-debug` | Build debug bundle (faster, not optimized) |
-| `make logo` | Generate app icons from `static/s3v-logo.png` |
-| `make deploy` | Tag current version and push to trigger release |
-| `make deploy-dry` | Show what version would be released |
-| `make minio` | Start local MinIO for testing |
-| `make minio-down` | Stop MinIO |
-| `make minio-clean` | Stop MinIO and delete all data |
-| `make clean` | Remove build artifacts |
+| `bun run dev:tauri` | Start Tauri dev (frontend + backend hot-reload) |
+| `bun run check:all` | Type-check Svelte + Rust |
+| `bun run fmt` | Format code (oxfmt + Prettier for Svelte + cargo fmt) |
+| `bun run build` | Build frontend only |
+| `bun run bundle` | Build distributable app (dmg/msi/deb) |
+| `bun run bundle:debug` | Build debug bundle (faster, not optimized) |
+| `bun run logo` | Generate app icons from `static/s3v-logo.png` |
+| `bun run deploy` | Tag current version and push to trigger release |
+| `bun run deploy:dry` | Show what version would be released |
+| `bun run rustfs` | Start local RustFS for testing |
+| `bun run rustfs:down` | Stop RustFS |
+| `bun run rustfs:clean` | Stop RustFS and delete all data |
+| `bun run clean` | Remove build artifacts |
 
-## Local Testing with MinIO
+## Local Testing with RustFS
+
+Tested with [RustFS](https://rustfs.com) — a Rust-native S3-compatible object storage.
 
 ```bash
-# Start MinIO + seed test data
-make minio
+# Start RustFS + seed test data
+bun run rustfs
 ```
 
 Creates three test buckets:
@@ -102,14 +103,14 @@ Connect in S3V:
 
 | Field | Value |
 | --- | --- |
-| Provider | minio |
+| Provider | rustfs |
 | Endpoint | `http://localhost:9000` |
 | Region | `us-east-1` |
-| Access Key | `minioadmin` |
-| Secret Key | `minioadmin` |
+| Access Key | `rustfsadmin` |
+| Secret Key | `rustfsadmin` |
 | Path Style | on |
 
-MinIO Web Console: [http://localhost:9001](http://localhost:9001)
+Web Console: [http://localhost:9001](http://localhost:9001)
 
 ## Project Structure
 
@@ -135,11 +136,11 @@ src-tauri/                  # Rust backend
 Releases are built automatically via GitHub Actions on tag push.
 
 ```bash
-make deploy-dry    # Check version
-make deploy        # Tag + push → builds macOS Universal, Windows x64, Windows ARM64
+bun run deploy:dry    # Check version
+bun run deploy        # Tag + push → builds macOS Universal, Windows x64/ARM64, Linux x64
 ```
 
-Artifacts: `.dmg` (macOS), `.exe` NSIS installer (Windows)
+Artifacts: `.dmg` (macOS), `.exe` NSIS installer (Windows), `.AppImage` / `.deb` (Linux)
 
 ## Tech Stack
 
@@ -150,6 +151,9 @@ Artifacts: `.dmg` (macOS), `.exe` NSIS installer (Windows)
 | Styling | Tailwind CSS + shadcn-svelte |
 | Backend | Rust (tokio, aws-sdk-s3) |
 | S3 API | AWS SDK for Rust |
+| Package manager | Bun |
+| Linter | oxlint + tsgolint (type-aware) |
+| Formatter | oxfmt (TS/CSS), Prettier (Svelte) |
 | Clipboard | tauri-plugin-clipboard-manager |
 | HTTP | reqwest (Rust-side, CORS-free) |
 

@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "options": {
+    "typeAware": true
+  },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/require-await": "warn",
+    "typescript/no-unsafe-assignment": "warn",
+    "typescript/no-unsafe-return": "warn",
+    "typescript/prefer-readonly-parameter-types": "off",
+    "typescript/promise-function-async": "off",
+    "typescript/strict-boolean-expressions": "off",
+    "typescript/restrict-template-expressions": "off",
+    "typescript/no-unnecessary-template-expression": "off"
+  },
+  "env": {
+    "builtin": true,
+    "browser": true
+  },
+  "ignorePatterns": [
+    "src/lib/paraglide/**",
+    "src/lib/components/ui/**",
+    "src/lib/index.ts",
+    "src/app.d.ts"
+  ]
+}

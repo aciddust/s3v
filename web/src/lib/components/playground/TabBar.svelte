@@ -4,7 +4,7 @@
 
   const providerColors: Record<string, string> = {
     aws: 'bg-amber-500',
-    minio: 'bg-red-500',
+    rustfs: 'bg-red-500',
     r2: 'bg-orange-500',
     custom: 'bg-blue-500',
   };

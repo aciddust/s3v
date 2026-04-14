@@ -1,7 +1,13 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
 export type MovePhase = 'start' | 'copying' | 'deleting' | 'moved' | 'completed' | 'failed';
-export type FolderOpPhase = 'started' | 'copying' | 'deleting' | 'completed' | 'failed' | 'cancelled';
+export type FolderOpPhase =
+  | 'started'
+  | 'copying'
+  | 'deleting'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
 export interface MoveJob {
   id: string;
@@ -49,10 +55,7 @@ class MoveStore {
 
   activeCount = $derived(
     this.jobs.filter(
-      (j) =>
-        j.phase !== 'completed' &&
-        j.phase !== 'failed' &&
-        j.phase !== 'cancelled',
+      (j) => j.phase !== 'completed' && j.phase !== 'failed' && j.phase !== 'cancelled',
     ).length,
   );
 

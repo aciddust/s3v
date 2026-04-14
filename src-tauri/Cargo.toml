@@ -55,3 +55,11 @@ wry = { path = "patches/wry" }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[profile.dev]
+opt-level = 0
+debug = 1
+incremental = true
+
+[profile.dev.package."*"]
+opt-level = 3

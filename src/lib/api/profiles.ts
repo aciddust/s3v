@@ -1,6 +1,6 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from "@tauri-apps/api/core";
 
-export type Provider = 'aws' | 'minio' | 'r2' | 'custom';
+export type Provider = "aws" | "rustfs" | "r2" | "custom";
 
 export interface ProfileSummary {
   id: string;
@@ -39,25 +39,28 @@ export interface ProfileDetail {
 }
 
 export function listProfiles(): Promise<ProfileSummary[]> {
-  return invoke('list_profiles');
+  return invoke("list_profiles");
 }
 
 export function getProfile(id: string): Promise<ProfileDetail> {
-  return invoke('get_profile', { id });
+  return invoke("get_profile", { id });
 }
 
 export function createProfile(profile: ProfileInput): Promise<string> {
-  return invoke('create_profile', { profile });
+  return invoke("create_profile", { profile });
 }
 
-export function updateProfile(id: string, profile: ProfileInput): Promise<void> {
-  return invoke('update_profile', { id, profile });
+export function updateProfile(
+  id: string,
+  profile: ProfileInput,
+): Promise<void> {
+  return invoke("update_profile", { id, profile });
 }
 
 export function deleteProfile(id: string): Promise<void> {
-  return invoke('delete_profile', { id });
+  return invoke("delete_profile", { id });
 }
 
 export function testConnection(id: string): Promise<ConnectionResult> {
-  return invoke('test_connection', { id });
+  return invoke("test_connection", { id });
 }

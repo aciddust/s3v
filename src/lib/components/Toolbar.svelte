@@ -163,6 +163,10 @@
   <!-- Search -->
   <div class="relative">
     <Search class="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-    <Input class="h-7 w-48 pl-7 text-xs" placeholder={m.toolbar_search()} bind:value={uiStore.searchQuery} />
+    <Input
+      class="h-7 w-48 pl-7 text-xs"
+      placeholder={m.toolbar_search()}
+      bind:value={uiStore.searchQuery}
+    />
   </div>
 </div>

@@ -14,7 +14,14 @@
     onconfirm: (prefix: string) => void;
   }
 
-  let { open = $bindable(), profileId, bucket, title = 'Move to...', confirmText, onconfirm }: Props = $props();
+  let {
+    open = $bindable(),
+    profileId,
+    bucket,
+    title = 'Move to...',
+    confirmText,
+    onconfirm,
+  }: Props = $props();
 
   interface FolderNode {
     prefix: string;
@@ -160,7 +167,9 @@
     </div>
 
     <div class="flex justify-end gap-2">
-      <Button variant="ghost" size="sm" onclick={() => (open = false)}>{m.folder_picker_cancel()}</Button>
+      <Button variant="ghost" size="sm" onclick={() => (open = false)}
+        >{m.folder_picker_cancel()}</Button
+      >
       <Button size="sm" onclick={handleConfirm}>{confirmText || m.folder_picker_confirm()}</Button>
     </div>
   </DialogContent>
