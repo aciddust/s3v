@@ -156,6 +156,195 @@ pub async fn copy_object(
 }
 
 #[tauri::command]
+pub async fn cross_profile_copy_object(
+    state: State<'_, AppState>,
+    source_profile_id: String,
+    source_bucket: String,
+    source_key: String,
+    dest_profile_id: String,
+    dest_bucket: String,
+    dest_key: String,
+) -> Result<(), AppError> {
+    logger::info(
+        "s3",
+        format!(
+            "Cross-profile copy [{source_profile_id}] {source_bucket}/{source_key} → [{dest_profile_id}] {dest_bucket}/{dest_key}"
+        ),
+    );
+    let source_client = get_client(&state, &source_profile_id).await?;
+    let dest_client = get_client(&state, &dest_profile_id).await?;
+    operations::cross_profile_copy_object(
+        &source_client,
+        &dest_client,
+        &source_bucket,
+        &source_key,
+        &dest_bucket,
+        &dest_key,
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn cross_profile_copy_folder(
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+    source_profile_id: String,
+    source_bucket: String,
+    source_prefix: String,
+    dest_profile_id: String,
+    dest_bucket: String,
+    dest_prefix: String,
+) -> Result<String, AppError> {
+    let source_client = get_client(&state, &source_profile_id).await?;
+    let dest_client = get_client(&state, &dest_profile_id).await?;
+    let op_id = uuid::Uuid::new_v4().to_string();
+
+    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+    {
+        let mut ops = state.folder_ops.lock().await;
+        ops.insert(op_id.clone(), cancel_tx);
+    }
+
+    let folder_ops = state.folder_ops.clone();
+    let op_id_clone = op_id.clone();
+
+    tokio::spawn(async move {
+        let all_keys = match operations::list_all_objects(
+            &source_client,
+            &source_bucket,
+            &source_prefix,
+        )
+        .await
+        {
+            Ok(keys) => keys,
+            Err(e) => {
+                let _ = app_handle.emit(
+                    "folder-op-progress",
+                    serde_json::json!({
+                        "id": op_id_clone,
+                        "op": "copy",
+                        "phase": "failed",
+                        "done": 0, "total": 0,
+                        "key": "",
+                        "source_prefix": source_prefix,
+                        "dest_prefix": dest_prefix,
+                        "error": e.to_string(),
+                    }),
+                );
+                let mut ops = folder_ops.lock().await;
+                ops.remove(&op_id_clone);
+                return;
+            }
+        };
+
+        let total = all_keys.len();
+        let _ = app_handle.emit(
+            "folder-op-progress",
+            serde_json::json!({
+                "id": op_id_clone,
+                "op": "copy",
+                "phase": "started",
+                "done": 0, "total": total,
+                "key": "",
+                "source_prefix": source_prefix,
+                "dest_prefix": dest_prefix,
+                "error": null,
+            }),
+        );
+
+        let mut done = 0usize;
+        for key in &all_keys {
+            if *cancel_rx.borrow() {
+                let _ = app_handle.emit(
+                    "folder-op-progress",
+                    serde_json::json!({
+                        "id": op_id_clone,
+                        "op": "copy",
+                        "phase": "cancelled",
+                        "done": done, "total": total,
+                        "key": "",
+                        "source_prefix": source_prefix,
+                        "dest_prefix": dest_prefix,
+                        "error": null,
+                    }),
+                );
+                let mut ops = folder_ops.lock().await;
+                ops.remove(&op_id_clone);
+                return;
+            }
+
+            let relative = key.strip_prefix(&source_prefix).unwrap_or(key);
+            let dest_key = format!("{}{}", dest_prefix, relative);
+
+            match operations::cross_profile_copy_object(
+                &source_client,
+                &dest_client,
+                &source_bucket,
+                key,
+                &dest_bucket,
+                &dest_key,
+            )
+            .await
+            {
+                Ok(()) => {
+                    done += 1;
+                    let _ = app_handle.emit(
+                        "folder-op-progress",
+                        serde_json::json!({
+                            "id": op_id_clone,
+                            "op": "copy",
+                            "phase": "copying",
+                            "done": done, "total": total,
+                            "key": key,
+                            "source_prefix": source_prefix,
+                            "dest_prefix": dest_prefix,
+                            "error": null,
+                        }),
+                    );
+                }
+                Err(e) => {
+                    done += 1;
+                    let _ = app_handle.emit(
+                        "folder-op-progress",
+                        serde_json::json!({
+                            "id": op_id_clone,
+                            "op": "copy",
+                            "phase": "failed",
+                            "done": done, "total": total,
+                            "key": key,
+                            "source_prefix": source_prefix,
+                            "dest_prefix": dest_prefix,
+                            "error": e.to_string(),
+                        }),
+                    );
+                }
+            }
+        }
+
+        // Create destination folder marker
+        let _ = operations::create_folder(&dest_client, &dest_bucket, &dest_prefix).await;
+
+        let _ = app_handle.emit(
+            "folder-op-progress",
+            serde_json::json!({
+                "id": op_id_clone,
+                "op": "copy",
+                "phase": "completed",
+                "done": done, "total": total,
+                "key": "",
+                "source_prefix": source_prefix,
+                "dest_prefix": dest_prefix,
+                "error": null,
+            }),
+        );
+        let mut ops = folder_ops.lock().await;
+        ops.remove(&op_id_clone);
+    });
+
+    Ok(op_id)
+}
+
+#[tauri::command]
 pub async fn move_objects(
     app_handle: AppHandle,
     state: State<'_, AppState>,

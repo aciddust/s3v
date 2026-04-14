@@ -25,6 +25,10 @@ class DragStore {
   modifierKey = $state<'meta' | 'shift' | null>(null);
   nearEdge = $state(false);
   nativeDragStarted = $state(false);
+  /** The profileId of the tab currently hovered during drag, or null */
+  hoverTabProfileId = $state<string | null>(null);
+  /** Whether the hovered tab accepts drops (same profile as drag source) */
+  hoverTabDroppable = $state(false);
   private isMac = navigator.platform.toUpperCase().includes('MAC');
 
   start(data: DragPayload, e: MouseEvent): void {
@@ -49,8 +53,22 @@ class DragStore {
       this.y = me.clientY;
       // Update hover target
       const el = document.elementFromPoint(me.clientX, me.clientY) as HTMLElement | null;
-      const dropRow = el?.closest('[data-drop-key]') as HTMLElement | null;
-      this.hoverDropKey = dropRow ? dropRow.dataset.dropKey! : '__panel__';
+
+      // Check if hovering over a tab
+      const tabEl = el?.closest('[data-tab-profile-id]') as HTMLElement | null;
+      if (tabEl) {
+        const tabProfileId = tabEl.dataset.tabProfileId!;
+        this.hoverTabProfileId = tabProfileId;
+        const sourceProfileId = this.payload?.profileId?.replace(/::right$/, '') ?? null;
+        // Droppable on any tab except the one the drag originated from
+        this.hoverTabDroppable = sourceProfileId !== tabProfileId;
+        this.hoverDropKey = null; // Don't highlight file rows while over tabs
+      } else {
+        this.hoverTabProfileId = null;
+        this.hoverTabDroppable = false;
+        const dropRow = el?.closest('[data-drop-key]') as HTMLElement | null;
+        this.hoverDropKey = dropRow ? dropRow.dataset.dropKey! : '__panel__';
+      }
       updateModifier(me);
 
       // Edge detection for native drag
@@ -95,6 +113,8 @@ class DragStore {
                 this.modifierKey = null;
                 this.nearEdge = false;
                 this.nativeDragStarted = false;
+                this.hoverTabProfileId = null;
+                this.hoverTabDroppable = false;
               }, 100);
             }).catch((err: unknown) => {
               console.error('Native drag failed:', err);
@@ -126,6 +146,8 @@ class DragStore {
         this.modifierKey = null;
         this.nearEdge = false;
         this.nativeDragStarted = false;
+        this.hoverTabProfileId = null;
+        this.hoverTabDroppable = false;
       }, 0);
     };
     window.addEventListener('mousemove', onMove);
@@ -137,6 +159,8 @@ class DragStore {
   consume(): DragPayload | null {
     const data = this.payload;
     this.payload = null;
+    this.hoverTabProfileId = null;
+    this.hoverTabDroppable = false;
     return data;
   }
 }

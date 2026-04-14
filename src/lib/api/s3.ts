@@ -170,3 +170,21 @@ export function moveFolder(
 export function cancelFolderOp(opId: string): Promise<void> {
   return invoke('cancel_folder_op', { opId });
 }
+
+export function crossProfileCopyObject(
+  sourceProfileId: string, sourceBucket: string, sourceKey: string,
+  destProfileId: string, destBucket: string, destKey: string,
+): Promise<void> {
+  return invoke('cross_profile_copy_object', {
+    sourceProfileId, sourceBucket, sourceKey, destProfileId, destBucket, destKey,
+  });
+}
+
+export function crossProfileCopyFolder(
+  sourceProfileId: string, sourceBucket: string, sourcePrefix: string,
+  destProfileId: string, destBucket: string, destPrefix: string,
+): Promise<string> {
+  return invoke('cross_profile_copy_folder', {
+    sourceProfileId, sourceBucket, sourcePrefix, destProfileId, destBucket, destPrefix,
+  });
+}

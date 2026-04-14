@@ -14,6 +14,7 @@
     onbgcontextmenu?: (e: MouseEvent) => void;
     onmovetoprefix?: (bucket: string, destPrefix: string, keys: string[]) => void;
     oncopytoprefix?: (
+      sourceProfileId: string,
       sourceBucket: string,
       destBucket: string,
       destPrefix: string,

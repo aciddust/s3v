@@ -163,6 +163,45 @@ pub async fn copy_object(
     Ok(())
 }
 
+/// Cross-profile copy: download from source client, upload to dest client.
+/// Works across different S3 endpoints (e.g., AWS → R2, MinIO → S3).
+pub async fn cross_profile_copy_object(
+    source_client: &S3Client,
+    dest_client: &S3Client,
+    source_bucket: &str,
+    source_key: &str,
+    dest_bucket: &str,
+    dest_key: &str,
+) -> Result<(), AppError> {
+    // Download from source
+    let resp = source_client
+        .get_object()
+        .bucket(source_bucket)
+        .key(source_key)
+        .send()
+        .await
+        .map_err(|e| AppError::S3(format!("Failed to get object from source: {e}")))?;
+
+    let body = resp
+        .body
+        .collect()
+        .await
+        .map_err(|e| AppError::S3(format!("Failed to read object body: {e}")))?;
+    let bytes = body.into_bytes();
+
+    // Upload to destination
+    dest_client
+        .put_object()
+        .bucket(dest_bucket)
+        .key(dest_key)
+        .body(aws_sdk_s3::primitives::ByteStream::from(bytes))
+        .send()
+        .await
+        .map_err(|e| AppError::S3(format!("Failed to put object to destination: {e}")))?;
+
+    Ok(())
+}
+
 pub async fn rename_object(
     client: &S3Client,
     bucket: &str,

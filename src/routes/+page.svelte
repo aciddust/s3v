@@ -36,6 +36,7 @@
   import { logStore } from '$lib/stores/logs.svelte';
   import { moveStore } from '$lib/stores/moves.svelte';
   import { uiStore, type ContextMenuItem } from '$lib/stores/ui.svelte';
+  import { dragStore } from '$lib/stores/drag.svelte';
 
   // API
   import {
@@ -50,6 +51,8 @@
     moveFolder,
     checkConflicts,
     classifyPaths,
+    crossProfileCopyObject,
+    crossProfileCopyFolder,
   } from '$lib/api/s3';
   import { enqueueUpload, enqueueDownload, enqueueFolderUpload, enqueueFolderDownload, onTransferCompleted, onTransferAdded } from '$lib/api/transfers';
   import { listProfiles, type ProfileSummary } from '$lib/api/profiles';
@@ -627,25 +630,41 @@
   }
 
   function handleCopyToPrefix(
+    sourceProfileId: string,
     sourceBucket: string,
     destBucket: string,
     destPrefix: string,
     keys: string[],
   ) {
     if (!activeProfileId) return;
-    const pid = activeProfileId;
+    const destProfileId = activeProfileId;
+    const isCrossProfile = sourceProfileId !== destProfileId;
     showConfirm('copy', keys, async () => {
       if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
       try {
         for (const key of keys) {
           if (key.endsWith('/')) {
             const folderName = key.slice(0, -1).split('/').pop() || '';
-            await copyFolder(pid, sourceBucket, key, destBucket, destPrefix + folderName + '/');
+            if (isCrossProfile) {
+              await crossProfileCopyFolder(
+                sourceProfileId, sourceBucket, key,
+                destProfileId, destBucket, destPrefix + folderName + '/',
+              );
+            } else {
+              await copyFolder(destProfileId, sourceBucket, key, destBucket, destPrefix + folderName + '/');
+            }
           } else {
             const filename = key.split('/').pop() || key;
             const jobId = moveStore.addJob('copy', key, destPrefix + filename);
             try {
-              await copyObject(pid, sourceBucket, key, destBucket, destPrefix + filename);
+              if (isCrossProfile) {
+                await crossProfileCopyObject(
+                  sourceProfileId, sourceBucket, key,
+                  destProfileId, destBucket, destPrefix + filename,
+                );
+              } else {
+                await copyObject(destProfileId, sourceBucket, key, destBucket, destPrefix + filename);
+              }
               moveStore.completeJob(jobId, 'completed');
             } catch (e) {
               moveStore.completeJob(jobId, 'failed');
@@ -653,12 +672,14 @@
             }
           }
         }
-        await fileStore.refresh(pid);
+        await fileStore.refresh(destProfileId);
+        await fileStore.refresh(sourceProfileId);
         if (uiStore.dualPanel) {
-          await fileStore.refresh(`${pid}::right`);
+          await fileStore.refresh(`${destProfileId}::right`);
         }
       } catch (e) {
         console.error('Copy failed:', e);
+        toast.error(String(e));
       }
     });
   }
@@ -683,6 +704,68 @@
         }
       } catch (e) {
         console.error('Move failed:', e);
+      }
+    });
+  }
+
+  function handleTabDrop(targetProfileId: string, _modifier: 'meta' | 'shift' | null) {
+    const data = dragStore.consume();
+    if (!data || !data.keys.length) return;
+
+    const sourceProfileId = data.profileId.replace(/::right$/, '');
+    const targetState = fileStore.getState(targetProfileId);
+    if (!targetState.bucket) return;
+
+    // Same bucket + same prefix → nothing to do
+    if (sourceProfileId === targetProfileId && data.bucket === targetState.bucket && data.sourcePrefix === targetState.prefix) return;
+
+    const keys = data.keys;
+    const sourceBucket = data.bucket;
+    const destBucket = targetState.bucket;
+    const destPrefix = targetState.prefix;
+
+    const isCrossProfile = sourceProfileId !== targetProfileId;
+
+    // Cross-tab always copies
+    showConfirm('copy', keys, async () => {
+      if (settingsStore.autoShowTransfers) uiStore.showTransferPanel();
+      try {
+        for (const key of keys) {
+          if (key.endsWith('/')) {
+            const folderName = key.slice(0, -1).split('/').pop() || '';
+            if (isCrossProfile) {
+              await crossProfileCopyFolder(
+                sourceProfileId, sourceBucket, key,
+                targetProfileId, destBucket, destPrefix + folderName + '/',
+              );
+            } else {
+              await copyFolder(sourceProfileId, sourceBucket, key, destBucket, destPrefix + folderName + '/');
+            }
+          } else {
+            const filename = key.split('/').pop() || key;
+            const jobId = moveStore.addJob('copy', key, destPrefix + filename);
+            try {
+              if (isCrossProfile) {
+                await crossProfileCopyObject(
+                  sourceProfileId, sourceBucket, key,
+                  targetProfileId, destBucket, destPrefix + filename,
+                );
+              } else {
+                await copyObject(sourceProfileId, sourceBucket, key, destBucket, destPrefix + filename);
+              }
+              moveStore.completeJob(jobId, 'completed');
+            } catch (e) {
+              moveStore.completeJob(jobId, 'failed');
+              throw e;
+            }
+          }
+        }
+        // Refresh both source and target
+        await fileStore.refresh(sourceProfileId);
+        await fileStore.refresh(targetProfileId);
+      } catch (e) {
+        console.error('Cross-tab copy failed:', e);
+        toast.error(String(e));
       }
     });
   }
@@ -770,7 +853,7 @@
     shareDisabled={fileState ? [...fileState.selected].some((k) => k.endsWith('/')) : false}
     onmultipartcleanup={() => (multipartCleanupOpen = true)}
   />
-  <TabBar />
+  <TabBar ontabdrop={handleTabDrop} />
 
   {#if activeTab && isConnected && activeProfileId && leftFileState}
     <div class="flex flex-1 min-h-0 overflow-hidden">

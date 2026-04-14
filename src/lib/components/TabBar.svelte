@@ -1,8 +1,16 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { profileStore } from '$lib/stores/profiles.svelte';
+  import { dragStore } from '$lib/stores/drag.svelte';
   import { uiStore } from '$lib/stores/ui.svelte';
   import ProfileTab from './ProfileTab.svelte';
   import { Plus, ChevronLeft, ChevronRight } from '@lucide/svelte';
+
+  interface Props {
+    ontabdrop?: (targetProfileId: string, modifier: 'meta' | 'shift' | null) => void;
+  }
+
+  const { ontabdrop }: Props = $props();
 
   const tabs = $derived(profileStore.tabs);
   const activeTabIndex = $derived(profileStore.activeTabIndex);
@@ -26,6 +34,31 @@
     tabs.length;
     // Use a microtask so DOM has updated
     queueMicrotask(updateScrollState);
+  });
+
+  onMount(() => {
+    function onInternalDrop(e: Event) {
+      if (!dragStore.payload) return;
+      const target = e.target as HTMLElement;
+      const tabEl = target.closest('[data-tab-profile-id]') as HTMLElement | null;
+      if (!tabEl) return;
+
+      const targetProfileId = tabEl.dataset.tabProfileId!;
+      // Skip dropping on the same tab the drag originated from
+      const sourceProfileId = dragStore.payload.profileId.replace(/::right$/, '');
+      if (sourceProfileId === targetProfileId) {
+        dragStore.consume();
+        return;
+      }
+
+      const modifier = (e as CustomEvent<{ modifier: 'meta' | 'shift' | null }>).detail?.modifier ?? null;
+      ontabdrop?.(targetProfileId, modifier);
+    }
+
+    scrollEl?.addEventListener('internaldrop', onInternalDrop);
+    return () => {
+      scrollEl?.removeEventListener('internaldrop', onInternalDrop);
+    };
   });
 </script>
 
@@ -52,6 +85,9 @@
         provider={tab.profile.provider}
         active={i === activeTabIndex}
         status={tab.status}
+        profileId={tab.profileId}
+        droppable={dragStore.active && dragStore.payload?.profileId?.replace(/::right$/, '') !== tab.profileId}
+        dragHover={dragStore.active && dragStore.hoverTabProfileId === tab.profileId}
         onactivate={() => profileStore.setActiveTab(tab.profileId)}
         onclose={() => profileStore.closeTab(tab.profileId)}
       />

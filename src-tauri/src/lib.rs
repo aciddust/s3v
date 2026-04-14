@@ -50,6 +50,8 @@ pub fn run() {
             s3::commands::copy_folder,
             s3::commands::move_folder,
             s3::commands::cancel_folder_op,
+            s3::commands::cross_profile_copy_object,
+            s3::commands::cross_profile_copy_folder,
             transfer::commands::enqueue_upload,
             transfer::commands::enqueue_download,
             transfer::commands::enqueue_folder_upload,

@@ -8,11 +8,14 @@
     provider: Provider;
     active: boolean;
     status: ConnectionStatus;
+    profileId: string;
+    droppable: boolean;
+    dragHover: boolean;
     onactivate: () => void;
     onclose: () => void;
   }
 
-  const { name, provider, active, status, onactivate, onclose }: Props = $props();
+  const { name, provider, active, status, profileId, droppable, dragHover, onactivate, onclose }: Props = $props();
 
   const providerColors: Record<Provider, string> = {
     aws: 'bg-amber-500',
@@ -30,6 +33,27 @@
           ? 'bg-red-500'
           : 'bg-zinc-500',
   );
+
+  const dragClass = $derived(
+    dragHover && droppable
+      ? 'ring-2 ring-primary ring-inset bg-primary/10'
+      : dragHover && !droppable
+        ? 'ring-2 ring-destructive ring-inset opacity-50'
+        : '',
+  );
+
+  let hoverTimer: ReturnType<typeof setTimeout> | undefined;
+
+  $effect(() => {
+    if (dragHover && droppable && !active) {
+      hoverTimer = setTimeout(() => {
+        onactivate();
+      }, 500);
+    } else {
+      clearTimeout(hoverTimer);
+    }
+    return () => clearTimeout(hoverTimer);
+  });
 </script>
 
 <!-- Use a div to avoid nested-button HTML violation -->
@@ -37,11 +61,13 @@
 <div
   role="tab"
   aria-selected={active}
+  data-tab-profile-id={profileId}
   class="group flex h-8 min-w-0 max-w-48 cursor-pointer items-center gap-1.5 border-r border-border
     px-3 text-xs transition-colors select-none
     {active
     ? 'bg-background text-foreground'
-    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'}"
+    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'}
+    {dragClass}"
   onclick={onactivate}
   onkeydown={(e) => e.key === 'Enter' && onactivate()}
   title={name}

@@ -15,6 +15,7 @@
     onbgcontextmenu?: (e: MouseEvent) => void;
     onmovetoprefix?: (bucket: string, destPrefix: string, keys: string[]) => void;
     oncopytoprefix?: (
+      sourceProfileId: string,
       sourceBucket: string,
       destBucket: string,
       destPrefix: string,
@@ -103,7 +104,7 @@
     const data = dragStore.consume();
     if (!data || !data.keys.length) return;
 
-    const isCross = data.profileId !== profileId;
+    const isCross = data.profileId !== profileId || data.bucket !== fs.bucket;
     const sameBucket = data.bucket === fs.bucket;
     const samePrefix = data.sourcePrefix === destPrefix;
 
@@ -112,15 +113,17 @@
     // Prevent dropping a folder into itself
     if (sameBucket && data.keys.some((k) => k === destPrefix)) return;
 
+    const sourceProfileId = data.profileId.replace(/::right$/, '');
+
     if (isCross) {
       if (modifier === 'shift') {
         onmovetoprefix?.(data.bucket, destPrefix, data.keys);
       } else {
-        oncopytoprefix?.(data.bucket, fs.bucket, destPrefix, data.keys);
+        oncopytoprefix?.(sourceProfileId, data.bucket, fs.bucket, destPrefix, data.keys);
       }
     } else {
       if (modifier === 'meta') {
-        oncopytoprefix?.(data.bucket, fs.bucket, destPrefix, data.keys);
+        oncopytoprefix?.(sourceProfileId, data.bucket, fs.bucket, destPrefix, data.keys);
       } else {
         onmovetoprefix?.(data.bucket, destPrefix, data.keys);
       }
